@@ -447,8 +447,9 @@ public class BBSRendering
         VideoRecorder videoRecorder = BBSModClient.getVideoRecorder();
 
         BBSModClient.getFilms().renderHud(batcher2D, tickDelta);
-
-        if (videoRecorder.isRecording() && BBSSettings.recordingOverlays.get() && UIScreen.getCurrentMenu() == null)
+        // ========== BBS PLAYER MOD - DISABLED VIDEO RECORDING OVERLAY ==========
+        // Video recording overlay disabled since recording feature is removed
+        /*if (videoRecorder.isRecording() && BBSSettings.recordingOverlays.get() && UIScreen.getCurrentMenu() == null)
         {
             int count = videoRecorder.getCounter();
             String label = UIKeys.FILM_VIDEO_RECORDING.format(
@@ -464,7 +465,7 @@ public class BBSRendering
             batcher2D.icon(Icons.SPHERE, Colors.RED | Colors.A100, x, y);
             batcher2D.textShadow(label, x + 18, y + 4);
         }
-    }
+        */}
 
     public static void renderCoolStuff(WorldRenderContext worldRenderContext)
     {

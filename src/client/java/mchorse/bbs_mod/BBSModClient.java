@@ -105,17 +105,20 @@ public class BBSModClient implements ClientModInitializer
 
     private static ParticleManager particles;
 
-    private static KeyBinding keyDashboard;
-    private static KeyBinding keyItemEditor;
-    private static KeyBinding keyPlayFilm;
-    private static KeyBinding keyPauseFilm;
-    private static KeyBinding keyRecordReplay;
-    private static KeyBinding keyRecordVideo;
-    private static KeyBinding keyOpenReplays;
-    private static KeyBinding keyOpenMorphing;
-    private static KeyBinding keyDemorph;
-    private static KeyBinding keyTeleport;
-    private static KeyBinding keyZoom;
+    // ========== BBS PLAYER MOD - ALL KEYBINDS DISABLED ==========
+    // All keybinds disabled - films can only be controlled via server commands
+    // private static KeyBinding keyDashboard;
+    // private static KeyBinding keyItemEditor;
+    // private static KeyBinding keyPlayFilm;
+    // private static KeyBinding keyPauseFilm;
+    // private static KeyBinding keyRecordReplay;
+    // private static KeyBinding keyRecordVideo;
+    // private static KeyBinding keyOpenReplays;
+    // private static KeyBinding keyOpenMorphing;
+    // private static KeyBinding keyDemorph;
+    // private static KeyBinding keyTeleport;
+    // private static KeyBinding keyZoom;
+    // ================================================================
 
     private static UIDashboard dashboard;
 
@@ -192,15 +195,18 @@ public class BBSModClient implements ClientModInitializer
         return gunZoom;
     }
 
-    public static KeyBinding getKeyZoom()
-    {
-        return keyZoom;
-    }
+    // ========== BBS PLAYER MOD - DISABLED EDITING METHODS ==========
+    // Disabled getters for editing-related keybinds
+    // public static KeyBinding getKeyZoom()
+    // {
+    //     return keyZoom;
+    // }
 
-    public static KeyBinding getKeyRecordVideo()
-    {
-        return keyRecordVideo;
-    }
+    // public static KeyBinding getKeyRecordVideo()
+    // {
+    //     return keyRecordVideo;
+    // }
+    // ================================================================
 
     public static UIDashboard getDashboard()
     {
@@ -398,17 +404,20 @@ public class BBSModClient implements ClientModInitializer
             .register(Link.bbs("curve"), CurveClientClip.class, new ClipFactoryData(Icons.ARC, 0xff1493));
 
         /* Keybinds */
-        keyDashboard = this.createKey("dashboard", GLFW.GLFW_KEY_0);
-        keyItemEditor = this.createKey("item_editor", GLFW.GLFW_KEY_HOME);
-        keyPlayFilm = this.createKey("play_film", GLFW.GLFW_KEY_RIGHT_CONTROL);
-        keyPauseFilm = this.createKey("pause_film", GLFW.GLFW_KEY_BACKSLASH);
-        keyRecordReplay = this.createKey("record_replay", GLFW.GLFW_KEY_RIGHT_ALT);
-        keyRecordVideo = this.createKey("record_video", GLFW.GLFW_KEY_F4);
-        keyOpenReplays = this.createKey("open_replays", GLFW.GLFW_KEY_RIGHT_SHIFT);
-        keyOpenMorphing = this.createKey("open_morphing", GLFW.GLFW_KEY_B);
-        keyDemorph = this.createKey("demorph", GLFW.GLFW_KEY_PERIOD);
-        keyTeleport = this.createKey("teleport", GLFW.GLFW_KEY_Y);
-        keyZoom = this.createKeyMouse("zoom", 2);
+        // ========== BBS PLAYER MOD - ALL KEYBINDS DISABLED ==========
+        // All keybinds disabled - films can only be controlled via server commands
+        // keyDashboard = this.createKey("dashboard", GLFW.GLFW_KEY_0);
+        // keyItemEditor = this.createKey("item_editor", GLFW.GLFW_KEY_HOME);
+        // keyPlayFilm = this.createKey("play_film", GLFW.GLFW_KEY_RIGHT_CONTROL);
+        // keyPauseFilm = this.createKey("pause_film", GLFW.GLFW_KEY_BACKSLASH);
+        // keyRecordReplay = this.createKey("record_replay", GLFW.GLFW_KEY_RIGHT_ALT);
+        // keyRecordVideo = this.createKey("record_video", GLFW.GLFW_KEY_F4);
+        // keyOpenReplays = this.createKey("open_replays", GLFW.GLFW_KEY_RIGHT_SHIFT);
+        // keyOpenMorphing = this.createKey("open_morphing", GLFW.GLFW_KEY_B);
+        // keyDemorph = this.createKey("demorph", GLFW.GLFW_KEY_PERIOD);
+        // keyTeleport = this.createKey("teleport", GLFW.GLFW_KEY_Y);
+        // keyZoom = this.createKeyMouse("zoom", 2);
+        // ================================================================
 
         WorldRenderEvents.AFTER_ENTITIES.register((context) ->
         {
@@ -510,8 +519,9 @@ public class BBSModClient implements ClientModInitializer
                 gunItemRenderer.update();
                 textures.update();
             }
-
-            while (keyDashboard.wasPressed()) UIScreen.open(getDashboard());
+            // ========== BBS PLAYER MOD - ALL KEYBINDS DISABLED ==========
+            // All keybinds disabled - films can only be controlled via server commands
+            /* while (keyDashboard.wasPressed()) UIScreen.open(getDashboard());
             while (keyItemEditor.wasPressed()) this.keyOpenModelBlockEditor(mc);
             while (keyPlayFilm.wasPressed()) this.keyPlayFilm();
             while (keyPauseFilm.wasPressed()) this.keyPauseFilm();
@@ -537,37 +547,41 @@ public class BBSModClient implements ClientModInitializer
                 dashboard.setPanel(dashboard.getPanel(UIMorphingPanel.class));
             }
             while (keyDemorph.wasPressed()) ClientNetwork.sendPlayerForm(null);
-            while (keyTeleport.wasPressed()) this.keyTeleport();
-
+            while (keyTeleport.wasPressed()) this.keyTeleport(); */
             if (mc.player != null)
             {
-                boolean zoom = keyZoom.isPressed();
-                ItemStack stack = mc.player.getMainHandStack();
+                // ========== BBS PLAYER MOD - DISABLED GUN ZOOM ==========
+                // Gun zoom functionality disabled
+                // boolean zoom = keyZoom.isPressed();
+                // ItemStack stack = mc.player.getMainHandStack();
 
-                if (gunZoom == null && zoom && stack.getItem() == BBSMod.GUN_ITEM)
-                {
-                    GunProperties properties = GunProperties.get(stack);
+                // if (gunZoom == null && zoom && stack.getItem() == BBSMod.GUN_ITEM)
+                // {
+                //     GunProperties properties = GunProperties.get(stack);
 
-                    ClientNetwork.sendZoom(true);
-                    gunZoom = new GunZoom(properties.fovTarget, properties.fovInterp, properties.fovDuration);
-                }
+                //     ClientNetwork.sendZoom(true);
+                //     gunZoom = new GunZoom(properties.fovTarget, properties.fovInterp, properties.fovDuration);
+                // }
+                // ================================================================
             }
         });
 
         HudRenderCallback.EVENT.register((drawContext, tickCounter) ->
         {
             BBSRendering.renderHud(drawContext, tickCounter.getTickDelta(false));
+            // ========== BBS PLAYER MOD - DISABLED GUN ZOOM ==========
+            // Gun zoom rendering disabled
+            // if (gunZoom != null)
+            // {
+            //     gunZoom.update(keyZoom.isPressed(), tickCounter.getLastFrameDuration());
 
-            if (gunZoom != null)
-            {
-                gunZoom.update(keyZoom.isPressed(), tickCounter.getLastFrameDuration());
-
-                if (gunZoom.canBeRemoved())
-                {
-                    ClientNetwork.sendZoom(false);
-                    gunZoom = null;
-                }
-            }
+            //     if (gunZoom.canBeRemoved())
+            //     {
+            //         ClientNetwork.sendZoom(false);
+            //         gunZoom = null;
+            //     }
+            // }
+            // ================================================================
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register((e) -> BBSResources.stopWatchdog());
@@ -647,8 +661,9 @@ public class BBSModClient implements ClientModInitializer
             "category." + BBSMod.MOD_ID + ".main"
         ));
     }
-
-    private void keyOpenModelBlockEditor(MinecraftClient mc)
+    // ========== BBS PLAYER MOD - DISABLED MODEL BLOCK EDITOR ==========
+    // Model block editor functionality disabled
+    /*private void keyOpenModelBlockEditor(MinecraftClient mc)
     {
         ItemStack stack = mc.player.getEquippedStack(EquipmentSlot.MAINHAND);
         ModelBlockItemRenderer.Item item = modelBlockItemRenderer.get(stack);
@@ -662,9 +677,11 @@ public class BBSModClient implements ClientModInitializer
         {
             UIScreen.open(new UIModelBlockEditorMenu(gunItem.properties));
         }
-    }
+    }*/
 
-    private void keyPlayFilm()
+    // ========== BBS PLAYER MOD - DISABLED PLAYBACK KEYBIND METHODS ==========
+    // Play and pause methods disabled - films controlled only via commands
+    /*private void keyPlayFilm()
     {
         UIFilmPanel panel = getDashboard().getPanel(UIFilmPanel.class);
 
@@ -731,7 +748,7 @@ public class BBSModClient implements ClientModInitializer
         {
             dashboard.setPanel(dashboard.getPanel(UIFilmPanel.class));
         }
-    }
+    }*/
 
     private void keyTeleport()
     {
