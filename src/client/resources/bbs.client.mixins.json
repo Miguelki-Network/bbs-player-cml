@@ -40,7 +40,9 @@
         "WorldMixin",
         "LivingEntityRendererInvoker",
         "EntityRenderDispatcherMixin",
-        "iris.ShadowRendererMixin"
+        "iris.ShadowRendererMixin",
+        "GhostWorldRendererMixin",
+        "GhostClientTickMixin"
     ],
     "injectors": {
         "defaultRequire": 1
