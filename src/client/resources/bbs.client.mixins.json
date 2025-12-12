@@ -25,6 +25,8 @@
         "sodium.ColorAttributeMixin",
         "iris.EntityVertexMixin",
         "KeyboardInputMixin",
+        
+        
         "EntityRendererMixin",
         "ClientPlayerEntityAccessor",
         "iris.IrisRenderingPipelineAccessor",
@@ -41,8 +43,7 @@
         "LivingEntityRendererInvoker",
         "EntityRenderDispatcherMixin",
         "iris.ShadowRendererMixin",
-        "GhostWorldRendererMixin",
-        "GhostClientTickMixin"
+        
     ],
     "injectors": {
         "defaultRequire": 1

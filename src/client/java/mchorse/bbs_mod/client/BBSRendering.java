@@ -9,6 +9,7 @@ import mchorse.bbs_mod.camera.clips.misc.CurveClip;
 import mchorse.bbs_mod.camera.clips.misc.SubtitleClip;
 import mchorse.bbs_mod.camera.controller.CameraWorkCameraController;
 import mchorse.bbs_mod.camera.controller.PlayCameraController;
+import mchorse.bbs_mod.client.cinematic.ThirdPersonFilmController;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.forms.renderers.utils.RecolorVertexConsumer;
 import mchorse.bbs_mod.graphics.texture.Texture;
@@ -331,6 +332,15 @@ public class BBSRendering
 
         renderingWorld = true;
 
+        // Force third-person when a film is playing to ensure player model renders in FP camera
+        if (BBSModClient.getCameraController().getCurrent() instanceof PlayCameraController)
+        {
+            if (!ThirdPersonFilmController.isActive())
+            {
+                ThirdPersonFilmController.begin();
+            }
+        }
+
         if (!customSize)
         {
             return;
@@ -349,6 +359,12 @@ public class BBSRendering
             Batcher2D batcher = new Batcher2D(drawContext);
 
             UISubtitleRenderer.renderSubtitles(batcher.getContext().getMatrices(), batcher, SubtitleClip.getSubtitles(controller.getContext()));
+        }
+
+        // Restore perspective if film playback controller is no longer active
+        if (!(BBSModClient.getCameraController().getCurrent() instanceof PlayCameraController) && ThirdPersonFilmController.isActive())
+        {
+            ThirdPersonFilmController.end();
         }
 
         if (!customSize)
