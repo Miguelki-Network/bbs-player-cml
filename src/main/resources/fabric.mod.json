@@ -2,10 +2,12 @@
     "schemaVersion": 1,
     "id": "bbs",
     "version": "${version}",
-    "name": "BBS mod",
+    "name": "BBS Player CML",
     "description": "A new generation of video production mod",
     "authors": [
-        "McHorse"
+        "MCHorse",
+        "ElgatoPro300",
+        "Miguelki"
     ],
     "contributors": [
         "Chryfi (tracker clip)",
