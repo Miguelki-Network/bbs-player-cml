@@ -23,17 +23,21 @@ import mchorse.bbs_mod.forms.entities.StubEntity;
 import mchorse.bbs_mod.forms.forms.BodyPart;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.ModelForm;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCache;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCacheEntry;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.settings.values.core.ValuePose;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.StencilMap;
 import mchorse.bbs_mod.utils.MathUtils;
+import mchorse.bbs_mod.utils.interps.Lerps;
 import mchorse.bbs_mod.utils.MatrixStackUtils;
 import mchorse.bbs_mod.utils.StringUtils;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.joml.Vectors;
 import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.PoseTransform;
+import mchorse.bbs_mod.utils.resources.LinkUtils;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
@@ -41,6 +45,7 @@ import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
+import net.minecraft.client.render.DiffuseLighting;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
@@ -48,11 +53,11 @@ import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.RotationAxis;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,18 +67,22 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 {
     private static Matrix4f uiMatrix = new Matrix4f();
 
-    private Map<String, Matrix4f> bones = new HashMap<>();
+    private MatrixCache bones = new MatrixCache();
 
     private ActionsConfig lastConfigs;
     private IAnimator animator;
     private ModelInstance lastModel;
+    private ModelInstance cachedModel;
+    private ModelInstance sourceModel;
+
+    private int lastAge = -1;
 
     private IEntity entity = new StubEntity();
 
     @Override
-    protected void applyTransforms(MatrixStack stack, float transition)
+    protected void applyTransforms(MatrixStack stack, boolean origin, float transition)
     {
-        super.applyTransforms(stack, transition);
+        super.applyTransforms(stack, origin, transition);
 
         ModelInstance model = this.getModel();
 
@@ -132,15 +141,56 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         return this.animator;
     }
 
+    public void invalidateCachedModel()
+    {
+        if (this.cachedModel != null)
+        {
+            this.cachedModel.delete();
+            this.cachedModel = null;
+        }
+
+        this.sourceModel = null;
+    }
+
     public ModelInstance getModel()
     {
-        return getModel(this.form);
+        String modelId = this.form.model.get();
+        ModelInstance model = BBSModClient.getModels().getModel(modelId);
+
+        if (this.cachedModel == null || !this.cachedModel.id.equals(modelId) || this.sourceModel != model)
+        {
+            if (this.cachedModel != null)
+            {
+                this.cachedModel.delete();
+            }
+
+            if (model != null)
+            {
+                this.cachedModel = model.copy();
+                this.cachedModel.setup();
+                this.sourceModel = model;
+            }
+            else
+            {
+                this.cachedModel = null;
+                this.sourceModel = null;
+            }
+        }
+
+        return this.cachedModel;
     }
 
     public Pose getPose()
     {
         Pose pose = this.form.pose.get().copy();
         Pose overlay = this.form.poseOverlay.get();
+
+        ModelInstance model = this.getModel();
+
+        if (model != null)
+        {
+            this.applyPose(pose, model.parts);
+        }
 
         this.applyPose(pose, overlay);
 
@@ -161,6 +211,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             if (value.fix != 0)
             {
+                poseTransform.fix = value.fix;
                 poseTransform.translate.lerp(value.translate, value.fix);
                 poseTransform.scale.lerp(value.scale, value.fix);
                 poseTransform.rotate.lerp(value.rotate, value.fix);
@@ -176,14 +227,20 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
                 poseTransform.pivot.add(value.pivot);
             }
 
-            /* También aplicar propiedades visuales del overlay (color, iluminación y textura).
-             * No se interpolan; el overlay copia sobre el destino si están presentes. */
-            poseTransform.color.copy(value.color);
-            poseTransform.lighting = value.lighting;
+            if (value.fix != 0)
+            {
+                poseTransform.color.lerp(value.color, value.fix);
+                poseTransform.lighting = Lerps.lerp(poseTransform.lighting, value.lighting, value.fix);
+            }
+            else
+            {
+                poseTransform.color.mul(value.color);
+                poseTransform.lighting += value.lighting;
+            }
 
             if (value.texture != null)
             {
-                poseTransform.texture = mchorse.bbs_mod.utils.resources.LinkUtils.copy(value.texture);
+                poseTransform.texture = LinkUtils.copy(value.texture);
             }
         }
     }
@@ -264,6 +321,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             BBSModClient.getTextures().bindTexture(texture);
             RenderSystem.depthFunc(GL11.GL_LEQUAL);
 
+            Vector3f light0 = new Vector3f(0.85F, 0.85F, -1F).normalize();
+            Vector3f light1 = new Vector3f(-0.85F, 0.85F, 1F).normalize();
+            RenderSystem.setupLevelDiffuseLighting(light0, light1);
+
             Supplier<ShaderProgram> mainShader = (BBSRendering.isIrisShadersEnabled() && BBSRendering.isRenderingWorld()) || !model.isVAORendered()
                 ? GameRenderer::getRenderTypeEntityTranslucentCullProgram
                 : BBSShaders::getModel;
@@ -282,6 +343,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
             stack.pop();
             stack.pop();
 
+            DiffuseLighting.disableGuiDepthLighting();
             RenderSystem.depthFunc(GL11.GL_ALWAYS);
         }
     }
@@ -326,7 +388,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         }
 
         /* Render items */
-        this.captureMatrices(model, null);
+        this.captureMatrices(model);
 
         if (stencilMap == null)
         {
@@ -342,7 +404,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
     private void renderArmor(IEntity target, MatrixStack stack, ArmorType type, ArmorSlot armorSlot, Color color, int overlay, int light)
     {
-        Matrix4f matrix = this.bones.get(armorSlot.group);
+        Matrix4f matrix = this.bones.get(armorSlot.group.get()).matrix();
 
         if (matrix != null)
         {
@@ -378,7 +440,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         for (ArmorSlot armorSlot : items)
         {
-            Matrix4f matrix = this.bones.get(armorSlot.group);
+            Matrix4f matrix = this.bones.get(armorSlot.group.get()).matrix();
 
             if (matrix != null)
             {
@@ -423,6 +485,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
     @Override
     public boolean renderArm(MatrixStack matrices, int light, AbstractClientPlayerEntity player, Hand hand)
     {
+        this.ensureAnimator(MinecraftClient.getInstance().getRenderTickCounter().getTickDelta(true));
         ModelInstance model = this.getModel();
 
         if (this.animator != null && model != null)
@@ -445,7 +508,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
                 while (g != null)
                 {
-                    if (g.id.equals(slot.group))
+                    if (g.id.equals(slot.group.get()))
                     {
                         visible = true;
 
@@ -509,7 +572,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             context.stack.multiply(RotationAxis.POSITIVE_Y.rotation(MathUtils.PI));
 
-            BBSModClient.getTextures().bindTexture(texture);
+            if (texture != null)
+            {
+                BBSModClient.getTextures().bindTexture(texture);
+            }
 
             Supplier<ShaderProgram> mainShader = (BBSRendering.isIrisShadersEnabled() && BBSRendering.isRenderingWorld()) || !model.isVAORendered()
                 ? GameRenderer::getRenderTypeEntityTranslucentCullProgram
@@ -533,10 +599,10 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
         model.fillStencilMap(context.stencilMap, this.form);
     }
 
-    private void captureMatrices(ModelInstance model, String target)
+    private void captureMatrices(ModelInstance model)
     {
         /* this.bones.clear()? */
-        model.captureMatrices(this.bones, target);
+        model.captureMatrices(this.bones);
     }
 
     @Override
@@ -546,7 +612,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
         for (BodyPart part : this.form.parts.getAllTyped())
         {
-            Matrix4f matrix = this.bones.get(part.bone.get());
+            Matrix4f matrix = this.bones.get(part.bone.get()).matrix();
 
             context.stack.push();
 
@@ -569,45 +635,51 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
     }
 
     @Override
-    public void collectMatrices(IEntity entity, String target, MatrixStack stack, Map<String, Matrix4f> matrices, String prefix, float transition)
+    public void collectMatrices(IEntity entity, MatrixStack stack, MatrixCache matrices, String prefix, float transition)
     {
         ModelInstance model = this.getModel();
+        Matrix4f mm = new Matrix4f();
+        Matrix4f oo = new Matrix4f();
 
         stack.push();
-        this.applyTransforms(stack, transition);
+        this.applyTransforms(stack, true, transition);
+        oo.set(stack.peek().getPositionMatrix());
+        stack.pop();
 
-        matrices.put(prefix, new Matrix4f(stack.peek().getPositionMatrix()));
+        stack.push();
+        this.applyTransforms(stack, false, transition);
+        mm.set(stack.peek().getPositionMatrix());
+
+        matrices.put(prefix, mm, oo);
 
         /* Collect bones and add them to matrix list */
         if (this.animator != null && model != null)
         {
             model.model.resetPose();
 
-            String localTarget = target;
-
-            if (target != null && !prefix.isEmpty())
-            {
-                String fullPrefix = prefix + "/";
-
-                if (localTarget.startsWith(fullPrefix) && localTarget.indexOf('/', localTarget.length()) == -1)
-                {
-                    localTarget = localTarget.substring(fullPrefix.length());
-                }
-            }
-
             this.animator.applyActions(entity, model, transition);
             model.model.applyPose(this.getPose());
 
             stack.multiply(RotationAxis.POSITIVE_Y.rotation(MathUtils.PI));
-            this.captureMatrices(model, localTarget);
+            this.captureMatrices(model);
         }
 
-        for (Map.Entry<String, Matrix4f> entry : this.bones.entrySet())
+        for (Map.Entry<String, MatrixCacheEntry> entry : this.bones.entrySet())
         {
+            Matrix4f matrix = new Matrix4f();
+            Matrix4f o = new Matrix4f();
+
             stack.push();
-            MatrixStackUtils.multiply(stack, entry.getValue());
-            matrices.put(StringUtils.combinePaths(prefix, entry.getKey()), new Matrix4f(stack.peek().getPositionMatrix()));
+            MatrixStackUtils.multiply(stack, entry.getValue().matrix());
+            matrix.set(stack.peek().getPositionMatrix());
             stack.pop();
+
+            stack.push();
+            MatrixStackUtils.multiply(stack, entry.getValue().origin());
+            o.set(stack.peek().getPositionMatrix());
+            stack.pop();
+
+            matrices.put(StringUtils.combinePaths(prefix, entry.getKey()), matrix, o);
         }
 
         int i = 0;
@@ -619,7 +691,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
             if (form != null)
             {
-                Matrix4f matrix = this.bones.get(part.bone.get());
+                Matrix4f matrix = this.bones.get(part.bone.get()).matrix();
 
                 stack.push();
 
@@ -634,7 +706,7 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
 
                 MatrixStackUtils.applyTransform(stack, part.transform.get());
 
-                FormUtilsClient.getRenderer(form).collectMatrices(part.useTarget.get() ? entity : part.getEntity(), target, stack, matrices, StringUtils.combinePaths(prefix, String.valueOf(i)), transition);
+                FormUtilsClient.getRenderer(form).collectMatrices(part.useTarget.get() ? entity : part.getEntity(), stack, matrices, StringUtils.combinePaths(prefix, String.valueOf(i)), transition);
 
                 stack.pop();
             }
@@ -652,9 +724,19 @@ public class ModelFormRenderer extends FormRenderer<ModelForm> implements ITicka
     {
         this.ensureAnimator(0F);
 
+        int age = entity.getAge();
+
         if (this.animator != null)
         {
+            if (this.lastAge != -1 && age != this.lastAge + 1)
+            {
+                this.resetAnimator();
+                this.ensureAnimator(0F);
+            }
+
             this.animator.update(entity);
         }
+
+        this.lastAge = age;
     }
 }

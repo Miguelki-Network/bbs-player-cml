@@ -5,8 +5,12 @@
     "name": "BBS Player CML",
     "description": "A new generation of video production mod",
     "authors": [
-        "MCHorse",
-        "ElgatoPro300",
+        "McHorse",
+        "ElGatoPro300",
+        "seb0lla",
+        "Diobede",
+        "Fanyel",
+        "Mattux",
         "Miguelki"
     ],
     "contributors": [
@@ -27,10 +31,11 @@
         "Rüyaperest (Turkish translations)",
         "Kirkus (Ukrainian translations)",
         "Eleeter (Urdu translations)",
-        "Diobede (Vietnamese translations)"
+        "Diobede (Vietnamese translations)",
+        "bay4lly.java (bug fixes)"
     ],
     "contact": {
-        "homepage": "https://www.patreon.com/McHorse"
+        "homepage": "https://discord.gg/MAHVQBSce6"
     },
     "license": "MIT",
     "icon": "assets/bbs/icon.png",
@@ -41,6 +46,9 @@
         ],
         "client": [
             "mchorse.bbs_mod.BBSModClient"
+        ],
+        "dynamiclights": [
+            "mchorse.bbs_mod.integration.LambDynLightsIntegration"
         ]
     },
     "mixins": [
@@ -52,7 +60,7 @@
     ],
     "accessWidener": "bbs.accesswidener",
     "depends": {
-        "fabricloader": ">=0.15.0",
+        "fabricloader": ">=0.16.14",
         "minecraft": "~1.21.1",
         "java": ">=21",
         "fabric-api": "*"

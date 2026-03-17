@@ -25,7 +25,6 @@ import mchorse.bbs_mod.ui.framework.elements.input.UIPropTransform;
 import mchorse.bbs_mod.ui.framework.elements.input.UITrackpad;
 import mchorse.bbs_mod.ui.framework.elements.input.text.UITextbox;
 import mchorse.bbs_mod.ui.framework.elements.utils.Batcher2D;
-import mchorse.bbs_mod.gizmos.BoneGizmoSystem;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.UIUtils;
@@ -179,15 +178,15 @@ public class UIModelBlockEditorMenu extends UIBaseMenu
             launchPower.setValue(gun.launchPower);
             launchAdditive.setValue(gun.launchAdditive);
             scatterX.setValue(gun.scatterX);
-            scatterX.tooltip(UIKeys.GUN_ITEM_SCATTER_H);
+            scatterX.tooltip(UIKeys.GUN_ITEM_SCATTER_V);
             scatterY.setValue(gun.scatterY);
-            scatterY.tooltip(UIKeys.GUN_ITEM_SCATTER_V);
+            scatterY.tooltip(UIKeys.GUN_ITEM_SCATTER_H);
             projectiles.setValue(gun.projectiles);
             projectiles.limit(1).integer();
 
             this.sectionGun = UI.scrollView(5, 10,
                 launch, launchPower, launchAdditive,
-                UI.label(UIKeys.GUN_ITEM_SCATTER).background().marginTop(6), UI.row(scatterX, scatterY),
+                UI.label(UIKeys.GUN_ITEM_SCATTER).background().marginTop(6), UI.row(scatterY, scatterX),
                 UI.label(UIKeys.GUN_ITEM_PROJECTILES).background().marginTop(6), projectiles
             );
             this.sectionGun.relative(this.viewport).x(1F).w(200).h(1F).anchorX(1F);
@@ -467,8 +466,6 @@ public class UIModelBlockEditorMenu extends UIBaseMenu
         {
             this.renderHighlight(context.batcher, icon.area);
         }
-
-        /* Gizmo removido del menú del editor de bloque de modelo */
     }
 
     private void renderHighlight(Batcher2D batcher, Area area)

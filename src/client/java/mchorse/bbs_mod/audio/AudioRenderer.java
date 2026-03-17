@@ -98,11 +98,10 @@ public class AudioRenderer
         }
     }
 
-    public static boolean renderAudio(File file, List<AudioClip> clips, int totalDuration, int sampleRate)
+    public static boolean renderAudio(File file, List<AudioClip> clips, int totalDuration, int sampleRate, float from, float to)
     {
         float total = totalDuration / 20F;
         Map<AudioClip, Wave> map = new HashMap<>();
-
 
         for (AudioClip clip : clips)
         {
@@ -114,8 +113,8 @@ public class AudioRenderer
             try
             {
                 Wave wave = AudioReader.read(BBSMod.getProvider(), clip.audio.get());
+
                 map.put(clip, wave);
-                
             }
             catch (Exception e)
             {
@@ -135,28 +134,24 @@ public class AudioRenderer
         byte[] bytes = new byte[totalBytes + (totalBytes % 2)];
         Wave finalWave = new Wave(1, 1, sampleRate, 16, bytes);
         ByteBuffer buffer = MemoryUtil.memAlloc(2);
-        
 
         for (AudioClip clip : clips)
         {
             try
             {
                 Wave wave = map.get(clip);
+
                 if (wave != null)
                 {
-                    /* Aplicar pendientes (envelope) al volumen durante la mezcla
-                     * Mezclamos por pequeños trozos para que el volumen siga la curva */
                     float clipDurationSec = TimeUtils.toSeconds(clip.duration.get());
                     float clipStartSec = TimeUtils.toSeconds(clip.tick.get());
                     float sourceStartSec = TimeUtils.toSeconds(clip.offset.get());
 
-                    /* Paso de mezcla: 10 ms para transiciones suaves */
                     final float stepSec = 0.01F;
 
                     for (float t = 0F; t < clipDurationSec; t += stepSec)
                     {
                         float chunkSec = Math.min(stepSec, clipDurationSec - t);
-                        /* Envelope espera ticks relativos dentro del clip */
                         float tickWithinClip = (t * 20F);
                         float factor = clip.envelope.factorEnabled(clip.duration.get(), tickWithinClip);
                         float gain = (clip.volume.get() / 100F) * factor;
@@ -166,12 +161,12 @@ public class AudioRenderer
                             continue;
                         }
 
-                        finalWave.add(buffer, wave,
-                            clipStartSec + t,
-                            sourceStartSec + t,
-                            chunkSec,
-                            gain
-                        );
+                    finalWave.add(buffer, wave,
+                        TimeUtils.toSeconds(clip.tick.get()) + t,
+                        TimeUtils.toSeconds(clip.offset.get()) + t,
+                        chunkSec,
+                        gain
+                    );
                     }
                 }
             }
@@ -185,6 +180,11 @@ public class AudioRenderer
 
         try
         {
+            if (from != to && (from >= 0 && to >= 0))
+            {
+                finalWave = finalWave.excerptMono(from, to);
+            }
+
             WaveWriter.write(file, finalWave);
 
             return true;

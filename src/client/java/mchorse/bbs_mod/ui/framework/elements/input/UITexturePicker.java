@@ -3,6 +3,7 @@ package mchorse.bbs_mod.ui.framework.elements.input;
 import mchorse.bbs_mod.BBSMod;
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.BBSSettings;
+import mchorse.bbs_mod.data.DataToString;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.graphics.texture.Texture;
@@ -10,6 +11,7 @@ import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.importers.IImportPathProvider;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.resources.packs.URLSourcePack;
+import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.dashboard.textures.UITexturePainter;
@@ -24,6 +26,7 @@ import mchorse.bbs_mod.ui.framework.elements.input.multilink.UIMultiLinkEditor;
 import mchorse.bbs_mod.ui.framework.elements.input.text.UITextbox;
 import mchorse.bbs_mod.ui.framework.elements.overlay.UIConfirmOverlayPanel;
 import mchorse.bbs_mod.ui.framework.elements.overlay.UIListOverlayPanel;
+import mchorse.bbs_mod.ui.framework.elements.overlay.UIMcmetaEditorPanel;
 import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlay;
 import mchorse.bbs_mod.ui.framework.elements.utils.EventPropagation;
 import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
@@ -125,22 +128,25 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
         for (Link link : BBSMod.getProvider().getLinksFromPath(Link.assets("")))
         {
             String string = link.toString();
+            String lower = string.toLowerCase();
 
-            if (string.endsWith(".png") && !string.contains(":textures/banners/")) list.add(string);
+            if (!string.contains(":textures/banners/") && (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg"))) list.add(string);
         }
 
         for (Link link : BBSMod.getProvider().getLinksFromPath(new Link("http", "")))
         {
             String string = link.toString();
+            String lower = string.toLowerCase();
 
-            if (string.contains(".png")) list.add(string);
+            if (lower.contains(".png") || lower.contains(".jpg") || lower.contains(".jpeg")) list.add(string);
         }
 
         for (Link link : BBSMod.getProvider().getLinksFromPath(new Link("https", "")))
         {
             String string = link.toString();
+            String lower = string.toLowerCase();
 
-            if (string.contains(".png")) list.add(string);
+            if (lower.contains(".png") || lower.contains(".jpg") || lower.contains(".jpeg")) list.add(string);
         }
 
         UIListOverlayPanel panel = new UIListOverlayPanel(UIKeys.TEXTURE_FIND_TITLE, callback);
@@ -177,6 +183,30 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
                 menu.action(Icons.COPY, UIKeys.TEXTURES_COPY, () -> Window.setClipboard(this.current.toString()));
             }
 
+            File file = BBSMod.getProvider().getFile(this.current);
+
+            if (file != null && file.isFile() && file.getName().endsWith(".png"))
+            {
+                File mcmeta = new File(file.getAbsolutePath() + ".mcmeta");
+
+                if (!mcmeta.exists())
+                {
+                    menu.action(Icons.ADD, UIKeys.TEXTURES_CREATE_MCMETA, () ->
+                    {
+                        MapType data = DataToString.mapFromString("{\"animation\":{\"frametime\":2}}");
+
+                        DataToString.writeSilently(mcmeta, data, true);
+                    });
+                }
+                else
+                {
+                    menu.action(Icons.EDIT, UIKeys.TEXTURES_MCMETA_EDIT, () ->
+                    {
+                    UIOverlay.addOverlay(this.getContext(), new UIMcmetaEditorPanel(mcmeta), 240, 160);
+                });
+                }
+            }
+
             menu.action(Icons.DOWNLOAD, UIKeys.TEXTURES_DOWNLOAD, () -> this.download(""));
         });
         this.close = new UIIcon(Icons.CLOSE, (b) -> this.close());
@@ -192,7 +222,12 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
                 UITexturePicker.this.updateFolderButton();
             }
         };
-        this.picker.filter((l) -> l.path.endsWith("/") || l.path.endsWith(".png")).cancelScrollEdge();
+        this.picker.filter((l) ->
+        {
+            String path = l.path.toLowerCase();
+
+            return path.endsWith("/") || path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".jpeg");
+        }).cancelScrollEdge();
 
         this.linear = new UIToggle(UIKeys.TEXTURES_LINEAR, (b) ->
         {
@@ -590,9 +625,15 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
 
     protected void updateOptions()
     {
+        if (this.current == null)
+        {
+            this.options.setVisible(false);
+            return;
+        }
+
         Texture texture = BBSModClient.getTextures().getTexture(this.current);
 
-        this.options.setVisible(this.current != null);
+        this.options.setVisible(true);
 
         if (texture != null)
         {
@@ -730,6 +771,11 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
         int index = this.picker.getIndex() + factor;
         int length = this.picker.getList().size();
 
+        if (length <= 0)
+        {
+            return true;
+        }
+
         if (index < 0) index = length - 1;
         else if (index >= length) index = 0;
 
@@ -737,6 +783,14 @@ public class UITexturePicker extends UIElement implements IImportPathProvider
 
         this.picker.setIndex(index);
         this.picker.scroll.scrollIntoView(index * this.picker.scroll.scrollItemSize);
+
+        UIFileLinkList.FileLink link = this.picker.getCurrentFirst();
+
+        if (link != null && !link.folder)
+        {
+            this.selectCurrent(link.link);
+        }
+
         this.typed = "";
 
         return true;

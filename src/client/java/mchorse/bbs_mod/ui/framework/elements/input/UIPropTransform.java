@@ -1,7 +1,6 @@
 package mchorse.bbs_mod.ui.framework.elements.input;
 
 import mchorse.bbs_mod.BBSSettings;
-import mchorse.bbs_mod.gizmos.BoneGizmoSystem;
 import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.settings.values.IValueNotifier;
@@ -10,6 +9,7 @@ import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
 import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
+import mchorse.bbs_mod.ui.utils.context.ContextMenuManager;
 import mchorse.bbs_mod.ui.utils.Gizmo;
 import mchorse.bbs_mod.ui.utils.UIUtils;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
@@ -23,10 +23,15 @@ import org.joml.Matrix3f;
 import org.joml.Vector3f;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 public class UIPropTransform extends UITransform
 {
+    public static final List<BiConsumer<UIPropTransform, ContextMenuManager>> contextMenuExtensions = new ArrayList<>();
+
     private static final double[] CURSOR_X = new double[1];
     private static final double[] CURSOR_Y = new double[1];
 
@@ -37,12 +42,15 @@ public class UIPropTransform extends UITransform
     private boolean editing;
     private int mode;
     private Axis axis = Axis.X;
+    private Axis secondaryAxis;
     private int lastX;
+    private int lastY;
     private Transform cache = new Transform();
     private Timer checker = new Timer(30);
 
     private boolean model;
     private boolean local;
+    private boolean freeRotation;
 
     private UITransformHandler handler;
 
@@ -59,6 +67,11 @@ public class UIPropTransform extends UITransform
             );
 
             menu.actions.add(0, menu.actions.remove(menu.actions.size() - 1));
+
+            for (BiConsumer<UIPropTransform, ContextMenuManager> consumer : contextMenuExtensions)
+            {
+                consumer.accept(this, menu);
+            }
         });
 
         this.iconT.callback = (b) -> this.toggleLocal();
@@ -142,84 +155,9 @@ public class UIPropTransform extends UITransform
 
     public UIPropTransform enableHotkeys()
     {
-        IKey category = UIKeys.GIZMOS_KEYS_CATEGORY;
+        IKey category = UIKeys.TRANSFORMS_KEYS_CATEGORY;
         Supplier<Boolean> active = () -> this.editing;
 
-        /* Cuando el toggle de Gizmos está ON, las teclas T/R/S cambian el modo del gizmo
-         * y se desactiva el flujo de edición por teclado/ratón de UIPropTransform. */
-        this.keys().register(Keys.GIZMOS_TRANSLATE, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().setMode(BoneGizmoSystem.Mode.TRANSLATE);
-            }
-            else
-            {
-                this.enableMode(0);
-            }
-        }).category(category);
-
-        this.keys().register(Keys.GIZMOS_SCALE, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().setMode(BoneGizmoSystem.Mode.SCALE);
-            }
-            else
-            {
-                this.enableMode(1);
-            }
-        }).category(category);
-
-        this.keys().register(Keys.GIZMOS_ROTATE, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().setMode(BoneGizmoSystem.Mode.ROTATE);
-            }
-            else
-            {
-                this.enableMode(2);
-            }
-        }).category(category);
-
-        /* Alternar modo de gizmo (ciclo entre Trasladar/Escalar/Rotar) */
-        this.keys().register(Keys.GIZMOS_TOGGLE_ENABLED, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().cycleMode(true);
-            }
-            else
-            {
-                this.enableMode((this.mode + 1) % 3);
-            }
-        }).category(category);
-
-        /* Pivote (solo cuando gizmos están activados) */
-        this.keys().register(Keys.GIZMOS_PIVOT, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().setMode(BoneGizmoSystem.Mode.PIVOT);
-            }
-        }).active(() -> BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0).category(UIKeys.GIZMOS_KEYS_CATEGORY);
-
-        /* Toggle entre canal de rotación principal (R) y secundario (R2) para el gizmo */
-        this.keys().register(Keys.GIZMOS_TOGGLE_ROTATION_CHANNEL, () ->
-        {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().toggleRotationChannel();
-            }
-        }).active(() -> BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0).category(UIKeys.GIZMOS_KEYS_CATEGORY);
-
-        /* Las teclas de eje X/Y/Z solo aplican cuando se está editando
-         * y los gizmos están desactivados (flujo clásico). */
-        Supplier<Boolean> axisActive = () -> this.editing && (!BBSSettings.gizmos.get() || BBSSettings.gizmoDesign.get() == 0);
-        this.keys().register(Keys.TRANSFORMATIONS_X, () -> this.axis = Axis.X).active(axisActive).category(UIKeys.TRANSFORMS_KEYS_CATEGORY);
-        this.keys().register(Keys.TRANSFORMATIONS_Y, () -> this.axis = Axis.Y).active(axisActive).category(UIKeys.TRANSFORMS_KEYS_CATEGORY);
-        this.keys().register(Keys.TRANSFORMATIONS_Z, () -> this.axis = Axis.Z).active(axisActive).category(UIKeys.TRANSFORMS_KEYS_CATEGORY);
         this.keys().register(Keys.TRANSFORMATIONS_TRANSLATE, () -> this.enableMode(0)).category(category);
         this.keys().register(Keys.TRANSFORMATIONS_SCALE, () -> this.enableMode(1)).category(category);
         this.keys().register(Keys.TRANSFORMATIONS_ROTATE, () -> this.enableMode(2)).category(category);
@@ -247,6 +185,11 @@ public class UIPropTransform extends UITransform
 
     public void setTransform(Transform transform)
     {
+        if (transform == null)
+        {
+            return;
+        }
+
         this.transform = transform;
 
         float minScale = Math.min(transform.scale.x, Math.min(transform.scale.y, transform.scale.z));
@@ -283,18 +226,100 @@ public class UIPropTransform extends UITransform
 
         UIContext context = this.getContext();
 
+        if (context == null)
+        {
+            return;
+        }
+
         if (this.editing)
         {
             Axis[] values = Axis.values();
 
             this.axis = values[MathUtils.cycler(this.axis.ordinal() + 1, 0, values.length - 1)];
+            this.secondaryAxis = null;
+            this.freeRotation = false;
 
             this.restore(true);
         }
         else
         {
             this.axis = axis == null ? Axis.X : axis;
+            this.secondaryAxis = null;
+            this.freeRotation = false;
             this.lastX = context.mouseX;
+            this.lastY = context.mouseY;
+        }
+
+        this.editing = true;
+        this.mode = mode;
+
+        this.cache.copy(this.transform);
+
+        if (!this.handler.hasParent())
+        {
+            context.menu.overlay.add(this.handler);
+        }
+    }
+
+    public void enablePlaneMode(int mode, Axis primary, Axis secondary)
+    {
+        if (Gizmo.INSTANCE.setMode(Gizmo.Mode.values()[mode]) && primary == null)
+        {
+            return;
+        }
+
+        UIContext context = this.getContext();
+
+        if (context == null)
+        {
+            return;
+        }
+
+        this.axis = primary == null ? Axis.X : primary;
+        this.secondaryAxis = secondary;
+        this.freeRotation = false;
+        this.lastX = context.mouseX;
+        this.lastY = context.mouseY;
+
+        this.editing = true;
+        this.mode = mode;
+
+        this.cache.copy(this.transform);
+
+        if (!this.handler.hasParent())
+        {
+            context.menu.overlay.add(this.handler);
+        }
+    }
+
+    public void enableFreeRotation(int mode, Axis marker)
+    {
+        if (Gizmo.INSTANCE.setMode(Gizmo.Mode.values()[mode]) && marker == null)
+        {
+            return;
+        }
+
+        UIContext context = this.getContext();
+
+        if (context == null)
+        {
+            return;
+        }
+
+        if (this.editing)
+        {
+            this.freeRotation = true;
+            this.secondaryAxis = null;
+
+            this.restore(true);
+        }
+        else
+        {
+            this.axis = Axis.X;
+            this.secondaryAxis = null;
+            this.lastX = context.mouseX;
+            this.lastY = context.mouseY;
+            this.freeRotation = true;
         }
 
         this.editing = true;
@@ -316,7 +341,7 @@ public class UIPropTransform extends UITransform
         }
         else if (this.mode == 2)
         {
-            return this.local && BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0 ? this.transform.rotate2 : this.transform.rotate;
+            return this.local && BBSSettings.gizmos.get() ? this.transform.rotate2 : this.transform.rotate;
         }
 
         return this.transform.translate;
@@ -336,6 +361,7 @@ public class UIPropTransform extends UITransform
     private void disable()
     {
         this.editing = false;
+        this.freeRotation = false;
 
         if (this.handler.hasParent())
         {
@@ -459,9 +485,12 @@ public class UIPropTransform extends UITransform
 
             MinecraftClient mc = MinecraftClient.getInstance();
             int w = mc.getWindow().getWidth();
+            int h = mc.getWindow().getHeight();
 
             double rawX = CURSOR_X[0];
+            double rawY = CURSOR_Y[0];
             double fx = Math.ceil(w / (double) context.menu.width);
+            double fy = Math.ceil(h / (double) context.menu.height);
             int border = 5;
             int borderPadding = border + 1;
 
@@ -479,9 +508,24 @@ public class UIPropTransform extends UITransform
                 this.lastX = (int) (borderPadding / fx);
                 this.checker.mark();
             }
+            else if (rawY <= border)
+            {
+                Window.moveCursor((int) mc.mouse.getX(), h - borderPadding);
+
+                this.lastY = context.menu.height - (int) (borderPadding / fy);
+                this.checker.mark();
+            }
+            else if (rawY >= h - border)
+            {
+                Window.moveCursor((int) mc.mouse.getX(), borderPadding);
+
+                this.lastY = (int) (borderPadding / fy);
+                this.checker.mark();
+            }
             else
             {
                 int dx = context.mouseX - this.lastX;
+                int dy = context.mouseY - this.lastY;
                 Vector3f vector = this.getValue();
                 boolean all = this.mode == 1 && Window.isCtrlPressed();
                 UITrackpad reference = this.mode == 0 ? this.tx : (this.mode == 1 ? this.sx : this.rx);
@@ -489,9 +533,37 @@ public class UIPropTransform extends UITransform
 
                 if (this.local && this.mode == 0)
                 {
-                    Vector3f vector3f = this.calculateLocalVector(factor * dx, this.axis);
+                    Vector3f local = new Vector3f();
 
-                    this.setT(null, vector.x + vector3f.x, vector.y + vector3f.y, vector.z + vector3f.z);
+                    if (this.secondaryAxis == null)
+                    {
+                        double delta;
+
+                        if (this.axis == Axis.Y && BBSSettings.gizmoYAxisHorizontal.get())
+                        {
+                            delta = factor * dx;
+                        }
+                        else if (this.axis == Axis.Y)
+                        {
+                            delta = factor * dy;
+                        }
+                        else
+                        {
+                            delta = factor * dx;
+                        }
+
+                        local.add(this.calculateLocalVector(delta, this.axis));
+                    }
+                    else
+                    {
+                        double primaryDelta = factor * dx;
+                        double secondaryDelta = factor * dy;
+
+                        local.add(this.calculateLocalVector(primaryDelta, this.axis));
+                        local.add(this.calculateLocalVector(secondaryDelta, this.secondaryAxis));
+                    }
+
+                    this.setT(null, vector.x + local.x, vector.y + local.y, vector.z + local.z);
                 }
                 else
                 {
@@ -502,9 +574,72 @@ public class UIPropTransform extends UITransform
                         vector3f.mul(180F / MathUtils.PI);
                     }
 
-                    if (this.axis == Axis.X || all) vector3f.x += factor * dx;
-                    if (this.axis == Axis.Y || all) vector3f.y += factor * dx;
-                    if (this.axis == Axis.Z || all) vector3f.z += factor * dx;
+                    if (this.mode == 2 && this.freeRotation)
+                    {
+                        vector3f.x -= factor * dy;
+                        vector3f.y += factor * dx;
+                    }
+                    else if (this.mode == 0 && this.secondaryAxis != null)
+                    {
+                        if (this.axis == Axis.X)
+                        {
+                            vector3f.x += factor * dx;
+                        }
+                        else if (this.axis == Axis.Y)
+                        {
+                            vector3f.y += factor * dx;
+                        }
+                        else if (this.axis == Axis.Z)
+                        {
+                            vector3f.z += factor * dx;
+                        }
+
+                        float secondaryDelta = factor * dy;
+
+                        if (this.secondaryAxis == Axis.X)
+                        {
+                            vector3f.x += secondaryDelta;
+                        }
+                        else if (this.secondaryAxis == Axis.Y)
+                        {
+                            vector3f.y -= secondaryDelta;
+                        }
+                        else if (this.secondaryAxis == Axis.Z)
+                        {
+                            vector3f.z -= secondaryDelta;
+                        }
+                    }
+                    else
+                    {
+                        if (this.mode == 0 && !this.local && this.secondaryAxis == null && !all)
+                        {
+                            if (this.axis == Axis.X)
+                            {
+                                vector3f.x += factor * dx;
+                            }
+                            else if (this.axis == Axis.Y)
+                            {
+                                if (BBSSettings.gizmoYAxisHorizontal.get())
+                                {
+                                    vector3f.y += factor * dx;
+                                }
+                                else
+                                {
+                                    vector3f.y -= factor * dy;
+                                }
+                            }
+                            else if (this.axis == Axis.Z)
+                            {
+                                vector3f.z += factor * dx;
+                            }
+                        }
+                        else
+                        {
+                            if (this.axis == Axis.X || all) vector3f.x += factor * dx;
+                            if (this.axis == Axis.Y || all) vector3f.y += factor * dx;
+                            if (this.axis == Axis.Z || all) vector3f.z += factor * dx;
+                        }
+                    }
 
                     if (this.mode == 0) this.setT(null, vector3f.x, vector3f.y, vector3f.z);
                     if (this.mode == 1) this.setS(null, vector3f.x, vector3f.y, vector3f.z);
@@ -518,6 +653,7 @@ public class UIPropTransform extends UITransform
                 this.setTransform(this.transform);
 
                 this.lastX = context.mouseX;
+                this.lastY = context.mouseY;
             }
         }
 

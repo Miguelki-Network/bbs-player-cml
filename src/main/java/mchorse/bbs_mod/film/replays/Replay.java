@@ -31,6 +31,7 @@ public class Replay extends ValueGroup
     public final ReplayKeyframes keyframes = new ReplayKeyframes("keyframes");
     public final FormProperties properties = new FormProperties("properties");
     public final Clips actions = new Clips("actions", BBSMod.getFactoryActionClips());
+    public final Inventory inventory = new Inventory("inventory");
 
     public final ValueBoolean enabled = new ValueBoolean("enabled", true);
     public final ValueString label = new ValueString("label", "");
@@ -38,6 +39,7 @@ public class Replay extends ValueGroup
     public final ValueString group = new ValueString("group", "");
     public final ValueBoolean shadow = new ValueBoolean("shadow", true);
     public final ValueFloat shadowSize = new ValueFloat("shadow_size", 0.5F);
+    public final ValueFloat shadowOpacity = new ValueFloat("shadow_opacity", 1F, 0F, 1F);
     public final ValueInt looping = new ValueInt("looping", 0);
 
     public final ValueBoolean actor = new ValueBoolean("actor", false);
@@ -46,8 +48,20 @@ public class Replay extends ValueGroup
     public final ValuePoint relativeOffset = new ValuePoint("relativeOffset", new Point(0, 0, 0));
 
     private final Map<String, String> customSheetTitles = new HashMap<>();
+    private final Map<String, String> anchoredBones = new HashMap<>();
+    private final Map<String, Integer> sheetColors = new HashMap<>();
     public final ValueBoolean axesPreview = new ValueBoolean("axes_preview", false);
     public final ValueString axesPreviewBone = new ValueString("axes_preview_bone", "");
+    public final ValueBoolean isGroup = new ValueBoolean("is_group", false);
+    public final ValueString uuid = new ValueString("uuid", "");
+
+    /* Item drop velocity configuration */
+    public final ValueFloat dropVelocityMinX = new ValueFloat("drop_velocity_min_x", -0.1F);
+    public final ValueFloat dropVelocityMaxX = new ValueFloat("drop_velocity_max_x", 0.1F);
+    public final ValueFloat dropVelocityMinY = new ValueFloat("drop_velocity_min_y", 0.1F);
+    public final ValueFloat dropVelocityMaxY = new ValueFloat("drop_velocity_max_y", 0.25F);
+    public final ValueFloat dropVelocityMinZ = new ValueFloat("drop_velocity_min_z", -0.1F);
+    public final ValueFloat dropVelocityMaxZ = new ValueFloat("drop_velocity_max_z", 0.1F);
 
     public Replay(String id)
     {
@@ -57,6 +71,7 @@ public class Replay extends ValueGroup
         this.add(this.keyframes);
         this.add(this.properties);
         this.add(this.actions);
+        this.add(this.inventory);
 
         this.add(this.enabled);
         this.add(this.label);
@@ -64,6 +79,7 @@ public class Replay extends ValueGroup
         this.add(this.group);
         this.add(this.shadow);
         this.add(this.shadowSize);
+        this.add(this.shadowOpacity);
         this.add(this.looping);
 
         this.add(this.actor);
@@ -73,10 +89,25 @@ public class Replay extends ValueGroup
 
         this.add(this.axesPreview);
         this.add(this.axesPreviewBone);
+        this.add(this.dropVelocityMinX);
+        this.add(this.dropVelocityMaxX);
+        this.add(this.dropVelocityMinY);
+        this.add(this.dropVelocityMaxY);
+        this.add(this.dropVelocityMinZ);
+        this.add(this.dropVelocityMaxZ);
+        this.add(this.isGroup);
+        this.add(this.uuid);
+        
+        this.uuid.set(java.util.UUID.randomUUID().toString());
     }
 
     public String getName()
     {
+        if (this.isGroup.get())
+        {
+            return this.label.get().isEmpty() ? "New Group" : this.label.get();
+        }
+
         String label = this.label.get();
 
         if (!label.isEmpty())
@@ -148,6 +179,40 @@ public class Replay extends ValueGroup
         }
     }
 
+    public String getAnchoredBone(String id)
+    {
+        return this.anchoredBones.get(id);
+    }
+
+    public void setAnchoredBone(String id, String bone)
+    {
+        if (bone == null || bone.isBlank())
+        {
+            this.anchoredBones.remove(id);
+        }
+        else
+        {
+            this.anchoredBones.put(id, bone);
+        }
+    }
+
+    public Integer getSheetColor(String id)
+    {
+        return this.sheetColors.get(id);
+    }
+
+    public void setSheetColor(String id, Integer color)
+    {
+        if (color == null)
+        {
+            this.sheetColors.remove(id);
+        }
+        else
+        {
+            this.sheetColors.put(id, color);
+        }
+    }
+
     @Override
     public void copy(BaseValueGroup group)
     {
@@ -157,6 +222,10 @@ public class Replay extends ValueGroup
         {
             this.customSheetTitles.clear();
             this.customSheetTitles.putAll(other.customSheetTitles);
+            this.anchoredBones.clear();
+            this.anchoredBones.putAll(other.anchoredBones);
+            this.sheetColors.clear();
+            this.sheetColors.putAll(other.sheetColors);
         }
     }
 
@@ -175,6 +244,30 @@ public class Replay extends ValueGroup
             }
 
             map.put("custom_sheet_titles", titles);
+        }
+
+        if (!this.anchoredBones.isEmpty())
+        {
+            MapType anchored = new MapType();
+
+            for (Map.Entry<String, String> entry : this.anchoredBones.entrySet())
+            {
+                anchored.put(entry.getKey(), new mchorse.bbs_mod.data.types.StringType(entry.getValue()));
+            }
+
+            map.put("anchored_bones", anchored);
+        }
+
+        if (!this.sheetColors.isEmpty())
+        {
+            MapType colors = new MapType();
+
+            for (Map.Entry<String, Integer> entry : this.sheetColors.entrySet())
+            {
+                colors.put(entry.getKey(), new mchorse.bbs_mod.data.types.IntType(entry.getValue()));
+            }
+
+            map.put("sheet_colors", colors);
         }
 
         return map;
@@ -201,6 +294,51 @@ public class Replay extends ValueGroup
                     }
                 }
             }
+
+            BaseType anchoredType = map.get("anchored_bones");
+
+            if (anchoredType instanceof MapType anchored)
+            {
+                for (String key : anchored.keys())
+                {
+                    BaseType value = anchored.get(key);
+
+                    if (value != null && value.isString())
+                    {
+                        this.anchoredBones.put(key, value.asString());
+                    }
+                }
+            }
+
+            BaseType colorsType = map.get("sheet_colors");
+
+            if (colorsType instanceof MapType colors)
+            {
+                for (String key : colors.keys())
+                {
+                    BaseType value = colors.get(key);
+
+                    if (value != null && value.isNumeric())
+                    {
+                        this.sheetColors.put(key, value.asNumeric().intValue());
+                    }
+                }
+            }
+        }
+
+        this.ensureShadowKeyframes();
+    }
+
+    private void ensureShadowKeyframes()
+    {
+        if (this.keyframes.shadowSize.isEmpty())
+        {
+            this.keyframes.shadowSize.insert(0, 0.5D);
+        }
+
+        if (this.keyframes.shadowOpacity.isEmpty())
+        {
+            this.keyframes.shadowOpacity.insert(0, 1D);
         }
     }
 }

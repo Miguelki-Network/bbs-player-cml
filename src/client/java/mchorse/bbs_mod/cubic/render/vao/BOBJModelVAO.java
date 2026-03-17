@@ -1,7 +1,9 @@
 package mchorse.bbs_mod.cubic.render.vao;
 
 import mchorse.bbs_mod.bobj.BOBJArmature;
+import mchorse.bbs_mod.bobj.BOBJBone;
 import mchorse.bbs_mod.bobj.BOBJLoader;
+import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.ui.framework.elements.utils.StencilMap;
 import mchorse.bbs_mod.utils.joml.Matrices;
@@ -11,6 +13,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 
@@ -35,10 +38,10 @@ public class BOBJModelVAO
     private int[] tmpLight;
     private float[] tmpTangents;
 
-    public BOBJModelVAO(BOBJLoader.CompiledData data)
+    public BOBJModelVAO(BOBJLoader.CompiledData data, BOBJArmature armature)
     {
         this.data = data;
-        this.armature = this.data.mesh.armature;
+        this.armature = armature;
 
         this.initBuffers();
     }
@@ -90,6 +93,9 @@ public class BOBJModelVAO
         GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, this.texCoordBuffer);
         GL30.glBufferData(GL30.GL_ARRAY_BUFFER, this.data.texData, GL30.GL_STATIC_DRAW);
         GL30.glVertexAttribPointer(Attributes.MID_TEXTURE_UV, 2, GL30.GL_FLOAT, false, 0, 0);
+
+        GL30.glBindBuffer(GL30.GL_ARRAY_BUFFER, 0);
+        GL30.glBindVertexArray(0);
     }
 
     /**
@@ -179,9 +185,16 @@ public class BOBJModelVAO
             result.set(0F, 0F, 0F, 0F);
             resultNormal.set(0F, 0F, 0F);
 
+            boolean allowBone = true;
+            if (stencilMap != null && stencilMap.allowedBones != null && lightBone >= 0)
+            {
+                String boneName = this.armature.orderedBones.get(lightBone).name;
+                allowBone = stencilMap.allowedBones.contains(boneName);
+            }
+
             if (stencilMap != null)
             {
-                this.tmpLight[i * 2] = Math.max(0, stencilMap.increment ? lightBone : 0);
+                this.tmpLight[i * 2] = Math.max(0, stencilMap.increment ? (allowBone ? lightBone : 0) : 0);
                 this.tmpLight[i * 2 + 1] = 0;
             }
         }
@@ -207,6 +220,8 @@ public class BOBJModelVAO
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, this.lightBuffer);
             GL15.glBufferData(GL15.GL_ARRAY_BUFFER, this.tmpLight, GL15.GL_DYNAMIC_DRAW);
         }
+
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
     }
 
     protected void processData(float[] newVertices, float[] newNormals)
@@ -214,19 +229,6 @@ public class BOBJModelVAO
 
     public void render(ShaderProgram shader, MatrixStack stack, float r, float g, float b, float a, StencilMap stencilMap, int light, int overlay)
     {
-        // Guard against null shader: choose a safe fallback to avoid NPE
-        if (shader == null)
-        {
-            ShaderProgram fallback = GameRenderer.getRenderTypeEntityTranslucentCullProgram();
-
-            if (fallback == null)
-            {
-                return;
-            }
-
-            shader = fallback;
-        }
-
         boolean hasShaders = BBSRendering.isIrisShadersEnabled();
 
         GL30.glVertexAttrib4f(Attributes.COLOR, r, g, b, a);

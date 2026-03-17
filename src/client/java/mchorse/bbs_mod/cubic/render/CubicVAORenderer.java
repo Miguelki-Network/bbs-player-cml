@@ -21,10 +21,6 @@ public class CubicVAORenderer extends CubicCubeRenderer
 {
     private ShaderProgram program;
     private ModelInstance model;
-    /**
-     * Optional default texture to use when a group doesn't have an override.
-     * This allows form-level textures to be respected.
-     */
     private Link defaultTexture;
 
     public CubicVAORenderer(ShaderProgram program, ModelInstance model, int light, int overlay, StencilMap stencilMap, ShapeKeys shapeKeys, Link defaultTexture)
@@ -39,11 +35,15 @@ public class CubicVAORenderer extends CubicCubeRenderer
     @Override
     public boolean renderGroup(BufferBuilder builder, MatrixStack stack, ModelGroup group, Model model)
     {
+        if (this.stencilMap != null && !this.stencilMap.isBoneAllowed(group.id))
+        {
+            return false;
+        }
+
         ModelVAO modelVAO = this.model.getVaos().get(group);
 
         if (modelVAO != null && group.visible)
         {
-            // Bind per-group texture override if present, otherwise form/default texture, then model texture
             if (group.textureOverride != null)
             {
                 BBSModClient.getTextures().bindTexture(group.textureOverride);

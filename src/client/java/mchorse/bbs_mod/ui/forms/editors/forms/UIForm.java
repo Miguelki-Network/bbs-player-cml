@@ -4,6 +4,8 @@ import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.Form;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCache;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCacheEntry;
 import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
@@ -20,8 +22,7 @@ import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.joml.Matrices;
 import org.joml.Matrix4f;
-
-import java.util.Map;
+import org.joml.Vector3f;
 
 public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>>
 {
@@ -29,7 +30,7 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
 
     public T form;
     public UIFormPanel<T> defaultPanel;
-    public UIFormPanel<T> generalPanel;
+    public UIGeneralFormPanel generalPanel;
 
     private UIPropTransform general;
 
@@ -58,17 +59,54 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
 
     public Matrix4f getOrigin(float transition)
     {
-        return this.getOrigin(transition, FormUtils.getPath(this.form), false);
+        return this.getOrigin(transition, FormUtils.getPath(this.form), this.generalPanel != null && this.generalPanel.transform.isLocal());
     }
 
     protected Matrix4f getOrigin(float transition, String path, boolean local)
     {
-        Form root = FormUtils.getRoot(this.form);
-        Map<String, Matrix4f> map = FormUtilsClient.getRenderer(root).collectMatrices(this.editor.renderer.getTargetEntity(), local ? null : path, transition);
-        Matrix4f matrix = map.get(path + "#origin");
-        if (matrix == null)
+        if (path == null)
         {
-            matrix = map.get(path);
+            return Matrices.EMPTY_4F;
+        }
+
+        Form root = FormUtils.getRoot(this.form);
+        MatrixCache map = FormUtilsClient.getRenderer(root).collectMatrices(this.editor.renderer.getTargetEntity(), transition);
+        
+        boolean forceOrigin = path.endsWith("#origin");
+        
+        if (forceOrigin) path = path.substring(0, path.length() - 7);
+        
+        MatrixCacheEntry entry = map.get(path);
+
+        if (entry == null)
+        {
+            return Matrices.EMPTY_4F;
+        }
+
+        Matrix4f matrix;
+
+        if (forceOrigin)
+        {
+            matrix = entry.origin();
+        }
+        else if (local)
+        {
+            Matrix4f localMatrix = entry.matrix();
+            Matrix4f originMatrix = entry.origin();
+
+            if (localMatrix != null && originMatrix != null)
+            {
+                matrix = new Matrix4f(localMatrix);
+                matrix.setTranslation(originMatrix.getTranslation(new Vector3f()));
+            }
+            else
+            {
+                matrix = localMatrix != null ? localMatrix : originMatrix;
+            }
+        }
+        else
+        {
+            matrix = entry.origin();
         }
 
         return matrix == null ? Matrices.EMPTY_4F : matrix;
@@ -93,8 +131,6 @@ public abstract class UIForm <T extends Form> extends UIPanelBase<UIFormPanel<T>
     {
         this.form = form;
 
-        /* Ensure a current view exists before any panel's startEdit triggers
-         * value changes that may collect undo data. */
         this.setPanel(this.defaultPanel);
 
         for (UIFormPanel<T> panel : this.panels)

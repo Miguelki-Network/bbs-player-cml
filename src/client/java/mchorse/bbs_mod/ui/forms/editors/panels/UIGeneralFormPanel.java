@@ -1,23 +1,23 @@
 package mchorse.bbs_mod.ui.forms.editors.panels;
 
+import com.mojang.logging.LogUtils;
 import mchorse.bbs_mod.forms.forms.Form;
-import mchorse.bbs_mod.forms.forms.StructureForm;
-import mchorse.bbs_mod.BBSMod;
-import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.forms.editors.forms.UIForm;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIToggle;
-import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.input.UIKeybind;
 import mchorse.bbs_mod.ui.framework.elements.input.UIPropTransform;
 import mchorse.bbs_mod.ui.framework.elements.input.UITrackpad;
 import mchorse.bbs_mod.ui.framework.elements.input.text.UITextbox;
 import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.keys.KeyCombo;
+import org.slf4j.Logger;
 
 public class UIGeneralFormPanel extends UIFormPanel
 {
+    private static final Logger LOGGER = LogUtils.getLogger();
+
     public UIKeybind hotkey;
 
     public UIToggle visible;
@@ -28,7 +28,6 @@ public class UIGeneralFormPanel extends UIFormPanel
     public UITrackpad uiScale;
     public UITextbox name;
     public UIPropTransform transform;
-    public UIButton calcCenter;
 
     public UIToggle hitbox;
     public UITrackpad hitboxWidth;
@@ -60,7 +59,11 @@ public class UIGeneralFormPanel extends UIFormPanel
         this.shaderShadow = new UIToggle(UIKeys.FORMS_EDITORS_GENERAL_SHADER_SHADOW, (b) -> this.form.shaderShadow.set(b.getValue()));
         this.uiScale = new UITrackpad((v) -> this.form.uiScale.set(v.floatValue()));
         this.uiScale.limit(0.01D, 100D);
-        this.name = new UITextbox(120, (t) -> this.form.name.set(t));
+        this.name = new UITextbox(120, (t) ->
+        {
+            this.form.name.set(t);
+            LOGGER.info("Form display name changed: formId={}, name={}", this.form.getFormId(), t);
+        });
 
         this.transform = new UIPropTransform().callbacks(() -> this.form.transform);
         this.transform.enableHotkeys().relative(this).x(0.5F).y(1F, -10).anchor(0.5F, 1F);
@@ -110,26 +113,6 @@ public class UIGeneralFormPanel extends UIFormPanel
         this.name.setText(form.name.get());
         this.transform.setTransform(form.transform.get());
 
-        /* Add "Calcular centro" for StructureForm under Transform section */
-        if (form instanceof StructureForm)
-        {
-            if (this.calcCenter == null)
-            {
-                this.calcCenter = new UIButton(UIKeys.FORMS_EDITORS_STRUCTURE_CALCULATE_CENTER, (b) -> this.calculateCenterForStructure((StructureForm) form));
-            }
-            if (!this.calcCenter.hasParent())
-            {
-                this.options.add(this.calcCenter);
-            }
-        }
-        else
-        {
-            if (this.calcCenter != null && this.calcCenter.hasParent())
-            {
-                this.calcCenter.removeFromParent();
-            }
-        }
-
         this.hitbox.setValue(form.hitbox.get());
         this.hitboxWidth.setValue(form.hitboxWidth.get());
         this.hitboxHeight.setValue(form.hitboxHeight.get());
@@ -139,64 +122,5 @@ public class UIGeneralFormPanel extends UIFormPanel
         this.hp.setValue(form.hp.get());
         this.speed.setValue(form.speed.get());
         this.stepHeight.setValue(form.stepHeight.get());
-    }
-
-    private void calculateCenterForStructure(StructureForm s)
-    {
-        String path = s.structureFile.get();
-        if (path == null || path.isEmpty())
-        {
-            return;
-        }
-
-        try (java.io.InputStream is = BBSMod.getProvider().getAsset(Link.assets(path)))
-        {
-            net.minecraft.nbt.NbtCompound root = net.minecraft.nbt.NbtIo.readCompressed(is, net.minecraft.nbt.NbtSizeTracker.ofUnlimitedBytes());
-
-            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-            int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-
-            if (root.contains("blocks", net.minecraft.nbt.NbtElement.LIST_TYPE))
-            {
-                net.minecraft.nbt.NbtList list = root.getList("blocks", net.minecraft.nbt.NbtElement.COMPOUND_TYPE);
-                for (int i = 0; i < list.size(); i++)
-                {
-                    net.minecraft.nbt.NbtCompound be = list.getCompound(i);
-                    net.minecraft.nbt.NbtList pos = be.getList("pos", net.minecraft.nbt.NbtElement.INT_TYPE);
-                    if (pos != null && pos.size() >= 3)
-                    {
-                        int x = pos.getInt(0);
-                        int y = pos.getInt(1);
-                        int z = pos.getInt(2);
-                        if (x < minX) minX = x;
-                        if (y < minY) minY = y;
-                        if (z < minZ) minZ = z;
-                        if (x > maxX) maxX = x;
-                        if (y > maxY) maxY = y;
-                        if (z > maxZ) maxZ = z;
-                    }
-                }
-            }
-
-            if (minX != Integer.MAX_VALUE)
-            {
-                float cx = (minX + maxX) / 2f;
-                float cy = (minY + maxY) / 2f;
-                float cz = (minZ + maxZ) / 2f;
-
-                int widthX = (maxX - minX + 1);
-                int widthY = (maxY - minY + 1);
-                int widthZ = (maxZ - minZ + 1);
-                float parityX = (widthX % 2 == 1) ? -0.5f : 0f;
-                float parityY = (widthY % 2 == 1) ? -0.5f : 0f;
-                float parityZ = (widthZ % 2 == 1) ? -0.5f : 0f;
-
-                s.pivotX.set(cx - parityX);
-                s.pivotY.set(cy - parityY);
-                s.pivotZ.set(cz - parityZ);
-                /* Keep auto behavior; renderer will ignore manual pivot anyway */
-            }
-        }
-        catch (Throwable ignored) {}
     }
 }

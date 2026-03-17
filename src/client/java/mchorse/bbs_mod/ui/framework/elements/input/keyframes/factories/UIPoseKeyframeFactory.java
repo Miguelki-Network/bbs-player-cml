@@ -26,6 +26,7 @@ import mchorse.bbs_mod.utils.CollectionUtils;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.joml.Vectors;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
+import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.PoseTransform;
@@ -75,6 +76,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
                 {
                     this.poseEditor.selectBone(sheet.anchoredBone);
                 }
+
+                this.poseEditor.refreshCurrentBone();
             }
         }
         else if (FormUtils.getForm(sheet.property) instanceof MobForm mobForm)
@@ -94,6 +97,18 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
     }
 
     @Override
+    public void update()
+    {
+        super.update();
+
+        if (this.poseEditor != null)
+        {
+            this.poseEditor.setPose(this.keyframe.getValue(), this.poseEditor.getPoseGroupKey());
+            this.poseEditor.refreshCurrentBone();
+        }
+    }
+
+    @Override
     public void resize()
     {
         this.poseEditor.removeAll();
@@ -107,7 +122,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         if (isAnchored)
         {
             this.poseEditor.anchoredLegend.setVisible(true);
-            this.poseEditor.anchoredLegend.label = mchorse.bbs_mod.l10n.keys.IKey.constant("Hueso anclado: " + sheet.anchoredBone);
+            IKey legendRaw = IKey.constant("%s %s");
+            this.poseEditor.anchoredLegend.label = legendRaw.format(UIKeys.POSE_TRACKS_ANCHOR_LEGEND, IKey.constant(sheet.anchoredBone));
             this.poseEditor.selectBone(sheet.anchoredBone);
         }
         else
@@ -222,6 +238,18 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         public UIButton unanchorBone;
         public mchorse.bbs_mod.ui.framework.elements.utils.UILabel anchoredLegend;
 
+        public void refreshCurrentBone()
+        {
+            String currentBone = this.getCurrentBone();
+
+            if (currentBone == null || currentBone.isEmpty())
+            {
+                currentBone = this.groups.list.getCurrentFirst();
+            }
+
+            this.pickBone(currentBone);
+        }
+
         public static void apply(UIKeyframes editor, Keyframe keyframe, Consumer<Pose> consumer)
         {
             for (UIKeyframeSheet sheet : editor.getGraph().getSheets())
@@ -254,8 +282,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
 
             ((UIPoseTransforms) this.transform).setKeyframe(this);
 
-            /* Leyenda para indicar hueso anclado */
-            this.anchoredLegend = UI.label(mchorse.bbs_mod.l10n.keys.IKey.constant("Hueso anclado: -"));
+            IKey legendRaw = IKey.constant("%s %s");
+            this.anchoredLegend = UI.label(legendRaw.format(UIKeys.POSE_TRACKS_ANCHOR_LEGEND, IKey.constant("-")));
             this.anchoredLegend.h(20);
             this.anchoredLegend.setVisible(false);
 
@@ -268,7 +296,7 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
                 if (sheet == null) return;
 
                 /* Overlay para elegir el hueso */
-                java.util.List<String> bones = this.groups.getList();
+                java.util.List<String> bones = this.groups.list.getList();
                 UISearchList<String> search = new UISearchList<>(new UIStringList(null));
                 UIList<String> list = search.list;
                 UIConfirmOverlayPanel panel = new UIConfirmOverlayPanel(
@@ -284,21 +312,19 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
                             if (bone != null)
                             {
                                 sheet.anchoredBone = bone;
-                                /* Refrescar estado inmediato */
                                 this.selectBone(bone);
                                 this.anchoredLegend.setVisible(true);
-                                this.anchoredLegend.label = mchorse.bbs_mod.l10n.keys.IKey.constant("Hueso anclado: " + bone);
+                                this.anchoredLegend.label = legendRaw.format(UIKeys.POSE_TRACKS_ANCHOR_LEGEND, IKey.constant(bone));
 
-                                /* Reacomodar el panel para evitar huecos */
                                 UIPoseKeyframeFactory factory = this.getParent(UIPoseKeyframeFactory.class);
                                 if (factory != null) { factory.resize(); }
 
-                                /* Renombrar automáticamente la pista usando títulos personalizados del Replay */
                                 mchorse.bbs_mod.ui.film.UIFilmPanel filmPanel = this.getParent(mchorse.bbs_mod.ui.film.UIFilmPanel.class);
                                 if (filmPanel != null && filmPanel.replayEditor != null && filmPanel.replayEditor.getReplay() != null)
                                 {
-                                    filmPanel.replayEditor.getReplay().setCustomSheetTitle(sheet.id, bone);
-                                    /* Evitar refresco pesado que cierra el editor; el título se reflejará en render */
+                                    mchorse.bbs_mod.film.replays.Replay replay = filmPanel.replayEditor.getReplay();
+                                    replay.setAnchoredBone(sheet.id, bone);
+                                    replay.setCustomSheetTitle(sheet.id, bone);
                                 }
                             }
                         }
@@ -308,7 +334,12 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
                 for (String g : bones) { list.add(g); }
 
                 /* Preseleccionar */
-                String current = sheet.anchoredBone != null ? sheet.anchoredBone : this.groups.getCurrentFirst();
+                String current = sheet.anchoredBone != null ? sheet.anchoredBone : this.getCurrentBone();
+
+                if (current == null || current.isEmpty())
+                {
+                    current = this.groups.list.getCurrentFirst();
+                }
                 int idx = bones.indexOf(current);
                 list.setIndex(Math.max(idx, 0));
 
@@ -327,15 +358,14 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
                     sheet.anchoredBone = null;
                     this.anchoredLegend.setVisible(false);
 
-                    /* Quitar el título personalizado al desanclar y refrescar lista */
                     mchorse.bbs_mod.ui.film.UIFilmPanel filmPanel = this.getParent(mchorse.bbs_mod.ui.film.UIFilmPanel.class);
                     if (filmPanel != null && filmPanel.replayEditor != null && filmPanel.replayEditor.getReplay() != null)
                     {
-                        filmPanel.replayEditor.getReplay().setCustomSheetTitle(sheet.id, null);
-                        /* Sin refresco inmediato para no cerrar el panel actual */
+                        mchorse.bbs_mod.film.replays.Replay replay = filmPanel.replayEditor.getReplay();
+                        replay.setAnchoredBone(sheet.id, null);
+                        replay.setCustomSheetTitle(sheet.id, null);
                     }
 
-                    /* Reacomodar el panel para que la lista regrese a su sitio */
                     UIPoseKeyframeFactory factory = this.getParent(UIPoseKeyframeFactory.class);
                     if (factory != null) { factory.resize(); }
                 }
@@ -371,7 +401,12 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         protected void pastePose(MapType data)
         {
-            String current = this.groups.getCurrentFirst();
+            String current = this.getCurrentBone();
+
+            if (current == null || current.isEmpty())
+            {
+                current = this.groups.list.getCurrentFirst();
+            }
 
             apply(this.editor, this.keyframe, (pose) -> pose.fromData(data));
             this.pickBone(current);
@@ -380,7 +415,12 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         protected void flipPose()
         {
-            String current = this.groups.getCurrentFirst();
+            String current = this.getCurrentBone();
+
+            if (current == null || current.isEmpty())
+            {
+                current = this.groups.list.getCurrentFirst();
+            }
 
             apply(this.editor, this.keyframe, (pose) -> pose.flip(this.flippedParts));
             this.pickBone(current);
@@ -414,6 +454,83 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
             this.editor = editor;
         }
 
+        private void checkAutoKeyframe()
+        {
+            if (BBSSettings.autoKeyframe.get() && BBSSettings.boneAnchoringEnabled.get())
+            {
+                mchorse.bbs_mod.ui.film.UIFilmPanel filmPanel = this.editor.getParent(mchorse.bbs_mod.ui.film.UIFilmPanel.class);
+
+                if (filmPanel != null)
+                {
+                    int cursor = filmPanel.getCursor();
+
+                    if (cursor != this.editor.keyframe.getTick())
+                    {
+                        UIKeyframeSheet sheet = this.editor.editor.getGraph().getSheet(this.editor.keyframe);
+
+                        if (sheet != null)
+                        {
+                            // Use interpolated pose at current cursor position instead of copying previous keyframe
+                            Pose pose = (Pose) sheet.channel.interpolate(cursor);
+                            String currentBone = this.editor.getCurrentBone();
+
+                            if (currentBone == null || currentBone.isEmpty())
+                            {
+                                currentBone = this.editor.groups.list.getCurrentFirst();
+                            }
+                            int index = sheet.channel.insert(cursor, pose);
+                            Keyframe<Pose> newKeyframe = sheet.channel.get(index);
+
+                            this.editor.keyframe = newKeyframe;
+                            this.editor.setPose(newKeyframe.getValue(), this.editor.getPoseGroupKey());
+
+                            if (currentBone != null)
+                            {
+                                this.editor.groups.list.setCurrentScroll(currentBone);
+                            }
+
+                            this.editor.refreshCurrentBone();
+
+                            // Explicitly update the transform editor's reference to the new keyframe's bone data
+                            // This prevents the 'accumulation' bug where dx/dy/dz are calculated against the OLD keyframe
+                            // but applied to the NEW keyframe, leading to exponential growth.
+                            if (currentBone != null)
+                            {
+                                PoseTransform pt = newKeyframe.getValue().get(currentBone);
+                                if (pt != null)
+                                {
+                                    this.setTransform(pt);
+                                }
+                            }
+
+                            sheet.selection.clear();
+                            sheet.selection.add(newKeyframe);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ensureTransformSync()
+        {
+            String currentBone = this.editor.getCurrentBone();
+
+            if (currentBone == null || currentBone.isEmpty())
+            {
+                currentBone = this.editor.groups.list.getCurrentFirst();
+            }
+
+            if (currentBone != null)
+            {
+                PoseTransform pt = this.editor.keyframe.getValue().get(currentBone);
+
+                if (pt != null && pt != this.getTransform())
+                {
+                    this.setTransform(pt);
+                }
+            }
+        }
+
         /**
          * Targets affected by editing. If a category is selected, return all
          * bones in that category; otherwise return the currently selected group.
@@ -424,7 +541,14 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
             String selectedCategory = categoriesEnabled && this.editor.categories != null ? this.editor.categories.getCurrentFirst() : null;
             if (selectedCategory == null || selectedCategory.isEmpty())
             {
-                return java.util.Collections.singletonList(this.editor.getGroup());
+                String currentBone = this.editor.getCurrentBone();
+
+                if (currentBone == null || currentBone.isEmpty())
+                {
+                    currentBone = this.editor.getGroup();
+                }
+
+                return java.util.Collections.singletonList(currentBone);
             }
 
             return this.editor.getCategoryBones(selectedCategory);
@@ -500,6 +624,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         public void setT(Axis axis, double x, double y, double z)
         {
+            this.checkAutoKeyframe();
+            this.ensureTransformSync();
             Transform transform = this.getTransform();
             float dx = (float) (x - transform.translate.x);
             float dy = (float) (y - transform.translate.y);
@@ -519,6 +645,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         public void setS(Axis axis, double x, double y, double z)
         {
+            this.checkAutoKeyframe();
+            this.ensureTransformSync();
             Transform transform = this.getTransform();
             float dx = (float) (x - transform.scale.x);
             float dy = (float) (y - transform.scale.y);
@@ -538,6 +666,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         public void setR(Axis axis, double x, double y, double z)
         {
+            this.checkAutoKeyframe();
+            this.ensureTransformSync();
             Transform transform = this.getTransform();
             float dx = MathUtils.toRad((float) x) - transform.rotate.x;
             float dy = MathUtils.toRad((float) y) - transform.rotate.y;
@@ -557,6 +687,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         public void setR2(Axis axis, double x, double y, double z)
         {
+            this.checkAutoKeyframe();
+            this.ensureTransformSync();
             Transform transform = this.getTransform();
             float dx = MathUtils.toRad((float) x) - transform.rotate2.x;
             float dy = MathUtils.toRad((float) y) - transform.rotate2.y;
@@ -576,6 +708,8 @@ public class UIPoseKeyframeFactory extends UIKeyframeFactory<Pose>
         @Override
         public void setP(Axis axis, double x, double y, double z)
         {
+            this.checkAutoKeyframe();
+            this.ensureTransformSync();
             Transform transform = this.getTransform();
             float dx = (float) x - transform.pivot.x;
             float dy = (float) y - transform.pivot.y;

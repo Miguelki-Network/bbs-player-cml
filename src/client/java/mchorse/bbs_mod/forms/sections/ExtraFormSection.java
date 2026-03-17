@@ -1,18 +1,22 @@
 package mchorse.bbs_mod.forms.sections;
 
+import mchorse.bbs_mod.BBSMod;
 import mchorse.bbs_mod.forms.FormCategories;
 import mchorse.bbs_mod.forms.categories.FormCategory;
 import mchorse.bbs_mod.forms.forms.AnchorForm;
 import mchorse.bbs_mod.forms.forms.BillboardForm;
 import mchorse.bbs_mod.forms.forms.BlockForm;
 import mchorse.bbs_mod.forms.forms.ExtrudedForm;
+import mchorse.bbs_mod.forms.forms.FluidForm;
 import mchorse.bbs_mod.forms.forms.FramebufferForm;
 import mchorse.bbs_mod.forms.forms.ItemForm;
 import mchorse.bbs_mod.forms.forms.LabelForm;
 import mchorse.bbs_mod.forms.forms.MobForm;
 import mchorse.bbs_mod.forms.forms.StructureForm;
+import mchorse.bbs_mod.forms.forms.ShapeForm;
 import mchorse.bbs_mod.forms.forms.TrailForm;
 import mchorse.bbs_mod.forms.forms.VanillaParticleForm;
+import mchorse.bbs_mod.forms.forms.LightForm;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.ui.UIKeys;
 import net.minecraft.block.Blocks;
@@ -54,25 +58,26 @@ public class ExtraFormSection extends FormSection
         VanillaParticleForm vanillaParticle = new VanillaParticleForm();
         TrailForm trail = new TrailForm();
         StructureForm structure = new StructureForm();
-        /* Preferir 'structures/tree.nbt' si existe en el listado; si no, tomar el primero .nbt */
+        FluidForm fluid = new FluidForm();
+        LightForm light = new LightForm();
+        ShapeForm shape = new ShapeForm();
         try
         {
             String preferred = "structures/tree.nbt";
             boolean foundPreferred = false;
 
-            for (Link link : mchorse.bbs_mod.BBSMod.getProvider().getLinksFromPath(Link.assets("structures")))
+            for (Link link : BBSMod.getProvider().getLinksFromPath(Link.assets("structures")))
             {
                 if (!foundPreferred && preferred.equals(link.path))
                 {
                     structure.structureFile.set(preferred);
                     foundPreferred = true;
-                    /* No rompemos el bucle para permitir que el set inicial quede si existe */
                 }
             }
 
             if (!foundPreferred)
             {
-                for (Link link : mchorse.bbs_mod.BBSMod.getProvider().getLinksFromPath(Link.assets("structures")))
+                for (Link link : BBSMod.getProvider().getLinksFromPath(Link.assets("structures")))
                 {
                     if (link.path.toLowerCase().endsWith(".nbt"))
                     {
@@ -99,6 +104,9 @@ public class ExtraFormSection extends FormSection
         extra.addForm(vanillaParticle);
         extra.addForm(trail);
         extra.addForm(structure);
+        extra.addForm(shape);
+        extra.addForm(fluid);
+        extra.addForm(light);
 
         this.mobsAnimals = new FormCategory(UIKeys.FORMS_CATEGORIES_MOBS_ANIMALS, this.parent.visibility.get("mobs_animals"));
         this.mobsNeutral = new FormCategory(UIKeys.FORMS_CATEGORIES_MOBS_NEUTRAL, this.parent.visibility.get("mobs_neutral"));
@@ -129,5 +137,10 @@ public class ExtraFormSection extends FormSection
     public List<FormCategory> getCategories()
     {
         return this.categories;
+    }
+
+    public FormCategory getExtraCategory()
+    {
+        return this.extra;
     }
 }

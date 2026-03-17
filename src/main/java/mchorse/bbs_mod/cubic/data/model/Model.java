@@ -150,15 +150,10 @@ public class Model implements IMapSerializable, IModel
 
             group.lighting = transform.lighting;
             group.color.copy(transform.color);
-            // Apply optional per-group texture override from pose
             Link texture = transform.texture;
             group.textureOverride = texture != null ? LinkUtils.copy(texture) : null;
             group.current.translate.add(transform.translate);
             group.current.scale.add(transform.scale).sub(1, 1, 1);
-            /* Para modelos/pose: el pivote de la pose debe sobreponer la posición
-             * sin alterar el modelo original, y además actualizar el punto de rotación.
-             * Aplicamos el delta de pivot a la traslación (override de posición)
-             * y también al pivot actual (centro de rotación de la pose). */
             group.current.translate.add(transform.pivot);
             group.current.pivot.add(transform.pivot);
             group.current.rotate.add(
@@ -261,6 +256,22 @@ public class Model implements IMapSerializable, IModel
     {
         MolangHelper.setMolangVariables(this.parser, target, tick, transition);
         CubicModelAnimator.postAnimate(this, action, tick);
+    }
+
+    public Model copy()
+    {
+        Model model = new Model(this.parser);
+        model.textureWidth = this.textureWidth;
+        model.textureHeight = this.textureHeight;
+
+        for (ModelGroup group : this.topGroups)
+        {
+            model.topGroups.add(group.copy(model, null));
+        }
+
+        model.initialize();
+
+        return model;
     }
 
     /* Deserialization / Serialization */

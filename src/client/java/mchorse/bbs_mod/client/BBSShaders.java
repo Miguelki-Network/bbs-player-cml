@@ -3,7 +3,6 @@ package mchorse.bbs_mod.client;
 import mchorse.bbs_mod.BBSMod;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.ShaderProgram;
-import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.resource.Resource;
 import net.minecraft.resource.ResourceFactory;
@@ -11,10 +10,15 @@ import net.minecraft.resource.ResourceManager;
 import net.minecraft.util.Identifier;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class BBSShaders
 {
+    public static final List<Runnable> LOADERS = new ArrayList<>();
+
+    private static ShaderProgram model;
     private static ShaderProgram multiLink;
     private static ShaderProgram subtitles;
 
@@ -31,6 +35,7 @@ public class BBSShaders
 
     public static void setup()
     {
+        if (model != null) model.close();
         if (subtitles != null) subtitles.close();
         if (subtitles != null) subtitles.close();
 
@@ -43,6 +48,8 @@ public class BBSShaders
         try
         {
             ResourceFactory factory = new ProxyResourceFactory(MinecraftClient.getInstance().getResourceManager());
+
+            model = new ShaderProgram(factory, "model", VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
             multiLink = new ShaderProgram(factory, "multilink", VertexFormats.POSITION_TEXTURE_COLOR);
             subtitles = new ShaderProgram(factory, "subtitles", VertexFormats.POSITION_TEXTURE_COLOR);
 
@@ -51,6 +58,11 @@ public class BBSShaders
             pickerBillboardNoShading = new ShaderProgram(factory, "picker_billboard_no_shading", VertexFormats.POSITION_TEXTURE_LIGHT_COLOR);
             pickerParticles = new ShaderProgram(factory, "picker_particles", VertexFormats.POSITION_COLOR_TEXTURE_LIGHT);
             pickerModels = new ShaderProgram(factory, "picker_models", VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
+        
+            for (Runnable runnable : LOADERS)
+            {
+                runnable.run();
+            }
         }
         catch (IOException e)
         {
@@ -60,8 +72,7 @@ public class BBSShaders
 
     public static ShaderProgram getModel()
     {
-        // Usar programa vanilla para VAO en modo normal; no cargar shader "model" propio
-        return GameRenderer.getRenderTypeEntityTranslucentCullProgram();
+        return model;
     }
 
     public static ShaderProgram getMultilinkProgram()
@@ -113,7 +124,7 @@ public class BBSShaders
         {
             if (id.getPath().contains("/core/"))
             {
-        return this.manager.getResource(Identifier.of(BBSMod.MOD_ID, id.getPath()));
+                return this.manager.getResource(Identifier.of(BBSMod.MOD_ID, id.getPath()));
             }
 
             return this.manager.getResource(id);

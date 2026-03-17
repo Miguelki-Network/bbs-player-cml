@@ -239,7 +239,7 @@ public abstract class Form extends ValueGroup
             entity.setHealth(hp);
         }
         if (speed != 0.1F) entity.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED).setBaseValue(speed);
-        // Step height adjustment removed in 1.21; skip
+        /* if (stepHeight != 0.5F) entity.setStepHeight(stepHeight); */
     }
 
     public void onDemorph(LivingEntity entity)
@@ -247,7 +247,7 @@ public abstract class Form extends ValueGroup
         entity.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).setBaseValue(20F);
         entity.setHealth(20F);
         entity.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED).setBaseValue(0.1F);
-        // Restore default step height skipped in 1.21
+        /* entity.setStepHeight(0.5F); */
     }
 
     /* ID and display name */
@@ -284,6 +284,11 @@ public abstract class Form extends ValueGroup
     protected String getDefaultDisplayName()
     {
         return this.getFormId();
+    }
+
+    public final String getDefaultDisplayNameForHud()
+    {
+        return this.getDefaultDisplayName();
     }
 
     public String getTrackName(String property)

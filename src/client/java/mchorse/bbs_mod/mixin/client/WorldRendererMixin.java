@@ -5,6 +5,7 @@ import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.client.BBSRendering;
 import mchorse.bbs_mod.utils.colors.Color;
 import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -16,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(WorldRenderer.class)
 public class WorldRendererMixin
@@ -48,13 +50,6 @@ public class WorldRendererMixin
         }
     }
 
-    // Eliminado el render dentro de renderLayer para evitar duplicados.
-    // Bajo Iris y vanilla, ahora usamos WorldRenderEvents.AFTER_ENTITIES.
-
-    /**
-     * Captura la matriz de cámara (vista) al configurar el frustum para replicar
-     * el comportamiento del ORIGINAL en el picking de films.
-     */
     @Inject(method = "setupFrustum", at = @At("HEAD"))
     public void onSetupFrustum(Vec3d vec3d, Matrix4f matrix4f, Matrix4f positionMatrix, CallbackInfo info)
     {

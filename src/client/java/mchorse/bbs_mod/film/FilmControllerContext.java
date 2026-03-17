@@ -1,14 +1,17 @@
 package mchorse.bbs_mod.film;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import io.netty.util.collection.IntObjectMap;
 import mchorse.bbs_mod.film.replays.Replay;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.ui.framework.elements.utils.StencilMap;
 import mchorse.bbs_mod.utils.colors.Colors;
+import mchorse.bbs_mod.utils.MatrixStackUtils;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Matrix4f;
 
 public class FilmControllerContext
 {
@@ -25,6 +28,7 @@ public class FilmControllerContext
     public float transition;
     public int color;
     public float shadowRadius;
+    public float shadowOpacity;
 
     public String bone;
     public boolean local;
@@ -34,6 +38,9 @@ public class FilmControllerContext
 
     public String nameTag = "";
     public boolean relative;
+    public boolean isShadowPass;
+    public Matrix4f localGroupTransform;
+    public Matrix4f viewMatrix;
 
     private FilmControllerContext()
     {}
@@ -42,11 +49,15 @@ public class FilmControllerContext
     {
         this.map = null;
         this.shadowRadius = 0F;
+        this.shadowOpacity = 1F;
         this.color = Colors.WHITE;
         this.bone = null;
         this.local = false;
         this.nameTag = "";
         this.relative = false;
+        this.isShadowPass = false;
+        this.localGroupTransform = null;
+        this.viewMatrix = null;
     }
 
     public FilmControllerContext setup(IntObjectMap<IEntity> entities, IEntity entity, Replay replay, WorldRenderContext context)
@@ -60,9 +71,8 @@ public class FilmControllerContext
         this.stack = context.matrixStack();
         if (this.stack == null)
         {
-            // Fallback: create a MatrixStack and apply current ModelView matrix
-            this.stack = new net.minecraft.client.util.math.MatrixStack();
-            mchorse.bbs_mod.utils.MatrixStackUtils.multiply(this.stack, com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix());
+            this.stack = new MatrixStack();
+            MatrixStackUtils.multiply(this.stack, RenderSystem.getModelViewMatrix());
         }
         this.consumers = context.consumers();
         this.transition = context.tickCounter().getTickDelta(false);
@@ -99,9 +109,25 @@ public class FilmControllerContext
         return this;
     }
 
+    public FilmControllerContext viewMatrix(Matrix4f viewMatrix)
+    {
+        this.viewMatrix = viewMatrix;
+
+        return this;
+    }
+
     public FilmControllerContext shadow(boolean shadow, float shadowRadius)
     {
         this.shadowRadius = shadow ? shadowRadius : 0F;
+        this.shadowOpacity = 1F;
+
+        return this;
+    }
+
+    public FilmControllerContext shadow(boolean shadow, float shadowRadius, float shadowOpacity)
+    {
+        this.shadowRadius = shadow ? shadowRadius : 0F;
+        this.shadowOpacity = shadow ? shadowOpacity : 0F;
 
         return this;
     }
@@ -109,6 +135,7 @@ public class FilmControllerContext
     public FilmControllerContext shadow(float shadowRadius)
     {
         this.shadowRadius = shadowRadius;
+        this.shadowOpacity = 1F;
 
         return this;
     }
@@ -146,6 +173,13 @@ public class FilmControllerContext
     public FilmControllerContext relative(boolean relative)
     {
         this.relative = relative;
+
+        return this;
+    }
+
+    public FilmControllerContext isShadowPass(boolean isShadowPass)
+    {
+        this.isShadowPass = isShadowPass;
 
         return this;
     }

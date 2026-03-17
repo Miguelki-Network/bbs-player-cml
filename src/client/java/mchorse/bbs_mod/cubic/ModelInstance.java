@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.cubic;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.bobj.BOBJBone;
 import mchorse.bbs_mod.cubic.data.animation.Animations;
 import mchorse.bbs_mod.cubic.data.model.Model;
@@ -17,15 +18,18 @@ import mchorse.bbs_mod.cubic.render.CubicVAORenderer;
 import mchorse.bbs_mod.cubic.render.vao.BOBJModelVAO;
 import mchorse.bbs_mod.cubic.render.vao.ModelVAO;
 import mchorse.bbs_mod.data.DataStorageUtils;
+import net.minecraft.client.render.Tessellator;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.forms.forms.ModelForm;
+import mchorse.bbs_mod.forms.renderers.utils.MatrixCache;
 import mchorse.bbs_mod.obj.shapes.ShapeKeys;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.ui.framework.elements.utils.StencilMap;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.colors.Color;
+import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.resources.LinkUtils;
 import net.minecraft.client.MinecraftClient;
@@ -52,6 +56,7 @@ public class ModelInstance implements IModelInstance
     public IModel model;
     public Animations animations;
     public Link texture;
+    public int color = Colors.WHITE;
 
     /* Model's additional properties */
     public String poseGroup;
@@ -65,6 +70,7 @@ public class ModelInstance implements IModelInstance
     public Vector3f scale = new Vector3f(1F);
     public float uiScale = 1F;
     public Pose sneakingPose = new Pose();
+    public Pose parts = new Pose();
 
     public List<ArmorSlot> itemsMain = new ArrayList<>();
     public List<ArmorSlot> itemsOff = new ArrayList<>();
@@ -132,18 +138,23 @@ public class ModelInstance implements IModelInstance
         this.culling = config.getBool("culling", this.culling);
         this.onCpu = config.getBool("on_cpu", this.onCpu);
         this.poseGroup = config.getString("pose_group", this.poseGroup);
+        if (this.poseGroup == null || this.poseGroup.isEmpty())
+        {
+            this.poseGroup = this.id;
+        }
 
         if (config.has("texture"))
         {
             this.texture = LinkUtils.create(config.get("texture"));
         }
+        if (config.has("color")) this.color = config.getInt("color");
         if (config.has("items_main"))
         {
             ListType list = config.get("items_main").asList();
 
             for (BaseType type : list)
             {
-                ArmorSlot slot = new ArmorSlot();
+                ArmorSlot slot = new ArmorSlot(String.valueOf(this.itemsMain.size()));
 
                 slot.fromData(type);
                 this.itemsMain.add(slot);
@@ -155,7 +166,7 @@ public class ModelInstance implements IModelInstance
 
             for (BaseType type : list)
             {
-                ArmorSlot slot = new ArmorSlot();
+                ArmorSlot slot = new ArmorSlot(String.valueOf(this.itemsOff.size()));
 
                 slot.fromData(type);
                 this.itemsOff.add(slot);
@@ -167,6 +178,11 @@ public class ModelInstance implements IModelInstance
         {
             this.sneakingPose = new Pose();
             this.sneakingPose.fromData(config.getMap("sneaking_pose"));
+        }
+        if (config.has("parts", BaseType.TYPE_MAP))
+        {
+            this.parts = new Pose();
+            this.parts.fromData(config.getMap("parts"));
         }
         if (config.has("anchor")) this.anchorGroup = config.getString("anchor");
         if (config.has("flipped_parts"))
@@ -192,7 +208,7 @@ public class ModelInstance implements IModelInstance
                 try
                 {
                     ArmorType type = ArmorType.valueOf(key.toUpperCase());
-                    ArmorSlot slot = new ArmorSlot();
+                    ArmorSlot slot = new ArmorSlot(key);
 
                     slot.fromData(map.getMap(key));
                     this.armorSlots.put(type, slot);
@@ -203,12 +219,12 @@ public class ModelInstance implements IModelInstance
         }
         if (config.has("fp_main"))
         {
-            this.fpMain = new ArmorSlot();
+            this.fpMain = new ArmorSlot("fp_main");
             this.fpMain.fromData(config.get("fp_main"));
         }
         if (config.has("fp_offhand"))
         {
-            this.fpOffhand = new ArmorSlot();
+            this.fpOffhand = new ArmorSlot("fp_offhand");
             this.fpOffhand.fromData(config.get("fp_offhand"));
         }
 
@@ -219,6 +235,120 @@ public class ModelInstance implements IModelInstance
 
             this.view.fromData(config.getMap("look_at"));
         }
+    }
+
+    public MapType toConfig()
+    {
+        MapType config = new MapType();
+
+        if (this.procedural) config.putBool("procedural", true);
+        if (!this.culling) config.putBool("culling", false);
+        if (this.onCpu) config.putBool("on_cpu", true);
+        if (!this.poseGroup.equals(this.id)) config.putString("pose_group", this.poseGroup);
+        if (!this.anchorGroup.isEmpty()) config.putString("anchor", this.anchorGroup);
+
+        if (this.texture != null) config.put("texture", LinkUtils.toData(this.texture));
+        if (this.color != Colors.WHITE) config.putInt("color", this.color);
+
+        if (!this.itemsMain.isEmpty())
+        {
+            ListType list = new ListType();
+
+            for (ArmorSlot slot : this.itemsMain)
+            {
+                list.add(slot.toData());
+            }
+
+            config.put("items_main", list);
+        }
+
+        if (!this.itemsOff.isEmpty())
+        {
+            ListType list = new ListType();
+
+            for (ArmorSlot slot : this.itemsOff)
+            {
+                list.add(slot.toData());
+            }
+
+            config.put("items_off", list);
+        }
+
+        if (this.uiScale != 1F) config.putFloat("ui_scale", this.uiScale);
+        if (this.scale.x != 1F || this.scale.y != 1F || this.scale.z != 1F)
+        {
+            config.put("scale", DataStorageUtils.vector3fToData(this.scale));
+        }
+
+        if (this.sneakingPose != null && !this.sneakingPose.transforms.isEmpty())
+        {
+            config.put("sneaking_pose", this.sneakingPose.toData());
+        }
+
+        if (this.parts != null && !this.parts.transforms.isEmpty())
+        {
+            config.put("parts", this.parts.toData());
+        }
+
+        if (!this.flippedParts.isEmpty())
+        {
+            MapType map = new MapType();
+
+            for (Map.Entry<String, String> entry : this.flippedParts.entrySet())
+            {
+                map.putString(entry.getKey(), entry.getValue());
+            }
+
+            config.put("flipped_parts", map);
+        }
+
+        if (!this.armorSlots.isEmpty())
+        {
+            MapType map = new MapType();
+
+            for (Map.Entry<ArmorType, ArmorSlot> entry : this.armorSlots.entrySet())
+            {
+                map.put(entry.getKey().name().toLowerCase(), entry.getValue().toData());
+            }
+
+            config.put("armor_slots", map);
+        }
+
+        if (this.fpMain != null) config.put("fp_main", this.fpMain.toData());
+        if (this.fpOffhand != null) config.put("fp_offhand", this.fpOffhand.toData());
+
+        return config;
+    }
+    public ModelInstance copy()
+    {
+        ModelInstance copy = new ModelInstance(this.id, this.model.copy(), this.animations, this.texture);
+
+        copy.poseGroup = this.poseGroup;
+        copy.procedural = this.procedural;
+        copy.culling = this.culling;
+        copy.onCpu = this.onCpu;
+        copy.anchorGroup = this.anchorGroup;
+        copy.view = this.view;
+
+        copy.scale.set(this.scale);
+        copy.uiScale = this.uiScale;
+        copy.sneakingPose = this.sneakingPose.copy();
+        copy.parts = this.parts.copy();
+        copy.color = this.color;
+
+        for (ArmorSlot slot : this.itemsMain) copy.itemsMain.add(slot.copy());
+        for (ArmorSlot slot : this.itemsOff) copy.itemsOff.add(slot.copy());
+        copy.flippedParts.putAll(this.flippedParts);
+
+        if (this.fpMain != null) copy.fpMain = this.fpMain.copy();
+        if (this.fpOffhand != null) copy.fpOffhand = this.fpOffhand.copy();
+
+        for (Map.Entry<ArmorType, ArmorSlot> entry : this.armorSlots.entrySet())
+        {
+            copy.armorSlots.put(entry.getKey(), entry.getValue().copy());
+        }
+
+        return copy;
     }
 
     public void setup()
@@ -278,18 +408,19 @@ public class ModelInstance implements IModelInstance
         }
     }
 
-    public void captureMatrices(Map<String, Matrix4f> bones, String target)
+    public void captureMatrices(MatrixCache bones)
     {
         if (this.model instanceof Model model)
         {
             MatrixStack stack = new MatrixStack();
-            CubicMatrixRenderer renderer = new CubicMatrixRenderer(model, target);
+            CubicMatrixRenderer renderer = new CubicMatrixRenderer(model);
 
             CubicRenderer.processRenderModel(renderer, null, stack, model);
 
             for (ModelGroup group : model.getAllGroups())
             {
                 Matrix4f matrix = new Matrix4f(renderer.matrices.get(group.index));
+                Matrix4f origin = new Matrix4f(renderer.origins.get(group.index));
 
                 matrix.translate(
                     group.initial.translate.x / 16,
@@ -297,17 +428,14 @@ public class ModelInstance implements IModelInstance
                     group.initial.translate.z / 16
                 );
                 matrix.rotateY(MathUtils.PI);
-                bones.put(group.id, matrix);
-
-                /* Also provide origin matrix captured before rotation/scale at the group's pivot */
-                Matrix4f origin = new Matrix4f(renderer.origins.get(group.index));
                 origin.translate(
                     group.initial.translate.x / 8192,
                     group.initial.translate.y / 8192,
                     group.initial.translate.z / 8192
                 );
                 origin.rotateY(MathUtils.PI);
-                bones.put(group.id + "#origin", origin);
+                
+                bones.put(group.id, matrix, origin);
             }
         }
         else if (this.model instanceof BOBJModel model)
@@ -316,22 +444,12 @@ public class ModelInstance implements IModelInstance
 
             for (BOBJBone orderedBone : model.getArmature().orderedBones)
             {
-                Matrix4f value = new Matrix4f();
-
-                value.rotateY(MathUtils.PI).mul(orderedBone.mat);
-                bones.put(orderedBone.name, value);
-
-                /* Origin matrix for BOBJ bones: parent transform + translation (no bone rotation/scale) */
+                Matrix4f matrix = new Matrix4f();
                 Matrix4f origin = new Matrix4f();
-                origin.rotateY(MathUtils.PI);
 
-                if (orderedBone.parentBone != null)
-                {
-                    origin.mul(new Matrix4f(orderedBone.parentBone.mat));
-                }
-
-                origin.translate(orderedBone.transform.translate);
-                bones.put(orderedBone.name + "#origin", origin);
+                matrix.rotateY(MathUtils.PI).mul(orderedBone.mat);
+                origin.rotateY(MathUtils.PI).mul(orderedBone.originMat);
+                bones.put(orderedBone.name, matrix, origin);
             }
         }
     }
@@ -345,7 +463,9 @@ public class ModelInstance implements IModelInstance
                 ? new CubicVAORenderer(program.get(), this, light, overlay, stencilMap, keys, defaultTexture)
                 : new CubicCubeRenderer(light, overlay, stencilMap, keys);
 
-            renderProcessor.setColor(color.r, color.g, color.b, color.a);
+            Color c = new Color().set(this.color);
+
+            renderProcessor.setColor(color.r * c.r, color.g * c.g, color.b * c.b, color.a * c.a);
 
             if (isVao)
             {
@@ -355,9 +475,18 @@ public class ModelInstance implements IModelInstance
             {
                 RenderSystem.setShader(program);
 
-                BufferBuilder builder = new BufferBuilder(new BufferAllocator(1536), VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
+                BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR_TEXTURE_OVERLAY_LIGHT_NORMAL);
+
                 CubicRenderer.processRenderModel(renderProcessor, builder, stack, model);
-                BufferRenderer.drawWithGlobalProgram(builder.end());
+
+                try
+                {
+                    BufferRenderer.drawWithGlobalProgram(builder.end());
+                }
+                catch (IllegalStateException e)
+                {
+                    
+                }
             }
         }
         else if (this.model instanceof BOBJModel model)

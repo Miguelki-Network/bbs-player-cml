@@ -5,6 +5,7 @@ import mchorse.bbs_mod.forms.forms.AnchorForm;
 import mchorse.bbs_mod.forms.forms.BillboardForm;
 import mchorse.bbs_mod.forms.forms.BlockForm;
 import mchorse.bbs_mod.forms.forms.ExtrudedForm;
+import mchorse.bbs_mod.forms.forms.FluidForm;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.FramebufferForm;
 import mchorse.bbs_mod.forms.forms.ItemForm;
@@ -15,10 +16,13 @@ import mchorse.bbs_mod.forms.forms.ParticleForm;
 import mchorse.bbs_mod.forms.forms.TrailForm;
 import mchorse.bbs_mod.forms.forms.VanillaParticleForm;
 import mchorse.bbs_mod.forms.forms.StructureForm;
+import mchorse.bbs_mod.forms.forms.ShapeForm;
+import mchorse.bbs_mod.forms.forms.LightForm;
 import mchorse.bbs_mod.forms.renderers.AnchorFormRenderer;
 import mchorse.bbs_mod.forms.renderers.BillboardFormRenderer;
 import mchorse.bbs_mod.forms.renderers.BlockFormRenderer;
 import mchorse.bbs_mod.forms.renderers.ExtrudedFormRenderer;
+import mchorse.bbs_mod.forms.renderers.FluidFormRenderer;
 import mchorse.bbs_mod.forms.renderers.FormRenderer;
 import mchorse.bbs_mod.forms.renderers.FormRenderingContext;
 import mchorse.bbs_mod.forms.renderers.FramebufferFormRenderer;
@@ -29,12 +33,15 @@ import mchorse.bbs_mod.forms.renderers.ModelFormRenderer;
 import mchorse.bbs_mod.forms.renderers.ParticleFormRenderer;
 import mchorse.bbs_mod.forms.renderers.TrailFormRenderer;
 import mchorse.bbs_mod.forms.renderers.VanillaParticleFormRenderer;
+import mchorse.bbs_mod.forms.renderers.ShapeFormRenderer;
 import mchorse.bbs_mod.forms.renderers.StructureFormRenderer;
+import mchorse.bbs_mod.forms.renderers.LightFormRenderer;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.TexturedRenderLayers;
 import net.minecraft.client.render.model.ModelLoader;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.Util;
 
 import java.util.Collections;
@@ -52,34 +59,8 @@ public class FormUtilsClient
 
     static
     {
-        java.util.SequencedMap<RenderLayer, BufferAllocator> sequencedMap = Util.make(new java.util.LinkedHashMap<>(), map -> {
-            assignBufferAllocator(map, TexturedRenderLayers.getEntitySolid());
-            assignBufferAllocator(map, TexturedRenderLayers.getEntityCutout());
-            assignBufferAllocator(map, TexturedRenderLayers.getBannerPatterns());
-            assignBufferAllocator(map, TexturedRenderLayers.getEntityTranslucentCull());
-            /* Asegurar soporte de capas base de bloques para miniaturas (vidrio, portales, hojas, etc.) */
-            assignBufferAllocator(map, RenderLayer.getSolid());
-            assignBufferAllocator(map, RenderLayer.getCutout());
-            assignBufferAllocator(map, RenderLayer.getTranslucent());
-            assignBufferAllocator(map, RenderLayer.getCutoutMipped());
-            assignBufferAllocator(map, TexturedRenderLayers.getShieldPatterns());
-            assignBufferAllocator(map, TexturedRenderLayers.getBeds());
-            assignBufferAllocator(map, TexturedRenderLayers.getShulkerBoxes());
-            assignBufferAllocator(map, TexturedRenderLayers.getSign());
-            assignBufferAllocator(map, TexturedRenderLayers.getHangingSign());
-            map.put(TexturedRenderLayers.getChest(), new BufferAllocator(786432));
-            assignBufferAllocator(map, RenderLayer.getArmorEntityGlint());
-            assignBufferAllocator(map, RenderLayer.getGlint());
-            assignBufferAllocator(map, RenderLayer.getGlintTranslucent());
-            assignBufferAllocator(map, RenderLayer.getEntityGlint());
-            assignBufferAllocator(map, RenderLayer.getDirectEntityGlint());
-            assignBufferAllocator(map, RenderLayer.getWaterMask());
-            ModelLoader.BLOCK_DESTRUCTION_RENDER_LAYERS.forEach(renderLayer -> assignBufferAllocator(map, renderLayer));
-        });
-
-        customVertexConsumerProvider = new CustomVertexConsumerProvider(new BufferAllocator(1536), sequencedMap);
-
         register(BillboardForm.class, BillboardFormRenderer::new);
+        register(FluidForm.class, FluidFormRenderer::new);
         register(ExtrudedForm.class, ExtrudedFormRenderer::new);
         register(LabelForm.class, LabelFormRenderer::new);
         register(ModelForm.class, ModelFormRenderer::new);
@@ -92,15 +73,17 @@ public class FormUtilsClient
         register(TrailForm.class, TrailFormRenderer::new);
         register(FramebufferForm.class, FramebufferFormRenderer::new);
         register(StructureForm.class, StructureFormRenderer::new);
-    }
-
-    private static void assignBufferAllocator(java.util.SequencedMap<RenderLayer, BufferAllocator> storage, RenderLayer layer)
-    {
-        storage.put(layer, new BufferAllocator(layer.getExpectedBufferSize()));
+        register(ShapeForm.class, ShapeFormRenderer::new);
+        register(LightForm.class, LightFormRenderer::new);
     }
 
     public static CustomVertexConsumerProvider getProvider()
     {
+        if (customVertexConsumerProvider == null)
+        {
+            customVertexConsumerProvider = new CustomVertexConsumerProvider(MinecraftClient.getInstance().getBufferBuilders().getEntityVertexConsumers());
+        }
+
         return customVertexConsumerProvider;
     }
 

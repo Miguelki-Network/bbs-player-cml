@@ -1,9 +1,8 @@
 package mchorse.bbs_mod;
 
-import mchorse.bbs_mod.client.BBSShaders;
-
 import com.mojang.blaze3d.systems.RenderSystem;
 import mchorse.bbs_mod.audio.SoundManager;
+import mchorse.bbs_mod.addons.AddonInfo;
 import mchorse.bbs_mod.blocks.entities.ModelProperties;
 import mchorse.bbs_mod.camera.clips.ClipFactoryData;
 import mchorse.bbs_mod.camera.clips.misc.AudioClientClip;
@@ -11,14 +10,39 @@ import mchorse.bbs_mod.camera.clips.misc.CurveClientClip;
 import mchorse.bbs_mod.camera.clips.misc.TrackerClientClip;
 import mchorse.bbs_mod.camera.controller.CameraController;
 import mchorse.bbs_mod.client.BBSRendering;
+import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.client.renderer.ModelBlockEntityRenderer;
+import mchorse.bbs_mod.client.renderer.TriggerBlockEntityRenderer;
 import mchorse.bbs_mod.client.renderer.entity.ActorEntityRenderer;
 import mchorse.bbs_mod.client.renderer.entity.GunProjectileEntityRenderer;
 import mchorse.bbs_mod.client.renderer.item.GunItemRenderer;
 import mchorse.bbs_mod.client.renderer.item.ModelBlockItemRenderer;
 import mchorse.bbs_mod.cubic.model.ModelManager;
+import mchorse.bbs_mod.events.BBSAddonMod;
 import mchorse.bbs_mod.events.register.RegisterClientSettingsEvent;
+import mchorse.bbs_mod.events.register.RegisterDashboardPanelsEvent;
+import mchorse.bbs_mod.events.register.RegisterFormCategoriesEvent;
+import mchorse.bbs_mod.events.register.RegisterImportersEvent;
+import mchorse.bbs_mod.events.register.RegisterInterpolationsEvent;
+import mchorse.bbs_mod.events.register.RegisterIconsEvent;
+import mchorse.bbs_mod.events.register.RegisterUIKeyframeFactoriesEvent;
+import mchorse.bbs_mod.events.register.RegisterKeyframeShapesEvent;
+import mchorse.bbs_mod.events.register.RegisterFormsRenderersEvent;
+import mchorse.bbs_mod.events.register.RegisterUIValueFactoriesEvent;
+import mchorse.bbs_mod.events.register.RegisterFormEditorsEvent;
+import mchorse.bbs_mod.forms.FormUtilsClient;
+import mchorse.bbs_mod.settings.ui.UIValueMap;
+import mchorse.bbs_mod.ui.forms.editors.UIFormEditor;
 import mchorse.bbs_mod.events.register.RegisterL10nEvent;
+import mchorse.bbs_mod.events.register.RegisterParticleComponentsEvent;
+import mchorse.bbs_mod.events.register.RegisterPropTransformEvent;
+import mchorse.bbs_mod.events.register.RegisterStencilMapEvent;
+import mchorse.bbs_mod.events.register.RegisterRayTracingEvent;
+import mchorse.bbs_mod.events.register.RegisterFilmPreviewEvent;
+import mchorse.bbs_mod.events.register.RegisterReplayListContextMenuEvent;
+import mchorse.bbs_mod.events.register.RegisterReplayPanelEvent;
+import mchorse.bbs_mod.events.register.RegisterShadersEvent;
+import mchorse.bbs_mod.events.register.RegisterSourcePacksEvent;
 import mchorse.bbs_mod.film.Films;
 import mchorse.bbs_mod.film.Recorder;
 import mchorse.bbs_mod.film.replays.Replay;
@@ -35,6 +59,8 @@ import mchorse.bbs_mod.morphing.Morph;
 import mchorse.bbs_mod.network.ClientNetwork;
 import mchorse.bbs_mod.network.ServerNetwork;
 import mchorse.bbs_mod.particles.ParticleManager;
+import mchorse.bbs_mod.particles.ParticleScheme;
+import mchorse.bbs_mod.utils.interps.Interpolations;
 import mchorse.bbs_mod.resources.AssetProvider;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.resources.packs.URLError;
@@ -45,6 +71,8 @@ import mchorse.bbs_mod.selectors.EntitySelectors;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.dashboard.UIDashboard;
 import mchorse.bbs_mod.ui.film.UIFilmPanel;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIKeyframeFactory;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.shapes.KeyframeShapeRenderers;
 import mchorse.bbs_mod.ui.framework.UIBaseMenu;
 import mchorse.bbs_mod.ui.framework.UIScreen;
 import mchorse.bbs_mod.ui.model_blocks.UIModelBlockEditorMenu;
@@ -58,6 +86,11 @@ import mchorse.bbs_mod.utils.VideoRecorder;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.resources.MinecraftSourcePack;
+import mchorse.bbs_mod.blocks.entities.TriggerBlockEntity;
+import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.metadata.ContactInformation;
+import net.fabricmc.loader.api.metadata.Person;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -74,14 +107,18 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.util.BufferAllocator;
+import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.Window;
 import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Matrix4fStack;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import org.lwjgl.glfw.GLFW;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -90,8 +127,18 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 public class BBSModClient implements ClientModInitializer
 {
+    public static final List<AddonInfo> registeredAddons = new ArrayList<>();
+
+    public static void registerAddon(AddonInfo info)
+    {
+        registeredAddons.add(info);
+    }
     private static TextureManager textures;
     private static FramebufferManager framebuffers;
     private static SoundManager sounds;
@@ -106,7 +153,6 @@ public class BBSModClient implements ClientModInitializer
     private static ParticleManager particles;
 
     // ========== BBS PLAYER MOD - ALL KEYBINDS DISABLED ==========
-    // All keybinds disabled - films can only be controlled via server commands
     // private static KeyBinding keyDashboard;
     // private static KeyBinding keyItemEditor;
     // private static KeyBinding keyPlayFilm;
@@ -118,6 +164,7 @@ public class BBSModClient implements ClientModInitializer
     // private static KeyBinding keyDemorph;
     // private static KeyBinding keyTeleport;
     // private static KeyBinding keyZoom;
+    // private static KeyBinding keyToggleReplayHud;
     // ================================================================
 
     private static UIDashboard dashboard;
@@ -127,6 +174,8 @@ public class BBSModClient implements ClientModInitializer
     private static GunItemRenderer gunItemRenderer = new GunItemRenderer();
     private static Films films;
     private static GunZoom gunZoom;
+
+    private static Replay selectedReplay;
 
     private static float originalFramebufferScale;
 
@@ -189,6 +238,17 @@ public class BBSModClient implements ClientModInitializer
     {
         return films;
     }
+
+     public static void setSelectedReplay(Replay replay)
+    {
+        selectedReplay = replay;
+    }
+
+    public static Replay getSelectedReplay()
+    {
+        return selectedReplay;
+    }
+
 
     public static GunZoom getGunZoom()
     {
@@ -324,6 +384,30 @@ public class BBSModClient implements ClientModInitializer
     @Override
     public void onInitializeClient()
     {
+        AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) ->
+        {
+            if (world.getBlockEntity(pos) instanceof TriggerBlockEntity)
+            {
+                if (player.isCreative())
+                {
+                    return ActionResult.PASS;
+                }
+
+                ClientNetwork.sendTriggerBlockClick(pos);
+
+                return ActionResult.SUCCESS;
+            }
+
+            return ActionResult.PASS;
+        });
+
+        FabricLoader.getInstance()
+            .getEntrypointContainers("bbs-addon-client", BBSAddonMod.class)
+            .forEach((container) ->
+            {
+                BBSMod.events.register(container.getEntrypoint());
+            });
+
         AssetProvider provider = BBSMod.getProvider();
 
         textures = new TextureManager(provider);
@@ -341,6 +425,22 @@ public class BBSModClient implements ClientModInitializer
 
         models = new ModelManager(provider);
         formCategories = new FormCategories();
+        BBSMod.events.post(new RegisterFormCategoriesEvent(formCategories));
+        BBSMod.events.post(new RegisterImportersEvent());
+        BBSMod.events.post(new RegisterParticleComponentsEvent(ParticleScheme.PARSER.components));
+        BBSMod.events.post(new RegisterInterpolationsEvent(Interpolations.MAP));
+        BBSMod.events.post(new RegisterFormsRenderersEvent());
+        BBSMod.events.post(new RegisterFormEditorsEvent(UIFormEditor.panels));
+        BBSMod.events.post(new RegisterIconsEvent());
+        BBSMod.events.post(new RegisterUIValueFactoriesEvent(UIValueMap.factories));
+        BBSMod.events.post(new RegisterUIKeyframeFactoriesEvent(UIKeyframeFactory.FACTORIES));
+        BBSMod.events.post(new RegisterKeyframeShapesEvent(KeyframeShapeRenderers.SHAPES));
+        BBSMod.events.post(new RegisterPropTransformEvent());
+        BBSMod.events.post(new RegisterStencilMapEvent());
+        BBSMod.events.post(new RegisterRayTracingEvent());
+        BBSMod.events.post(new RegisterFilmPreviewEvent());
+        BBSMod.events.post(new RegisterReplayListContextMenuEvent());
+        BBSMod.events.post(new RegisterReplayPanelEvent());
         screenshotRecorder = new ScreenshotRecorder(new File(parentFile, "screenshots"));
         videoRecorder = new VideoRecorder();
         selectors = new EntitySelectors();
@@ -357,15 +457,99 @@ public class BBSModClient implements ClientModInitializer
         KeybindSettings.registerClasses();
 
         BBSMod.setupConfig(Icons.KEY_CAP, "keybinds", new File(BBSMod.getSettingsFolder(), "keybinds.json"), KeybindSettings::register);
+        BBSMod.setupConfig(Icons.SETTINGS, "cml", new File(BBSMod.getSettingsFolder(), "cml.json"), (builder) ->
+        {
+            builder.category("general");
+            BBSSettings.modelFormsHierarchy = builder.getBoolean("model_forms_hierarchy", false);
+            builder.category("appearance");
+            BBSSettings.disablePivotTransform = builder.getBoolean("disable_pivot_transform", false);
+            BBSSettings.gizmoYAxisHorizontal = builder.getBoolean("gizmo_y_axis_horizontal", true);
+            BBSSettings.pickLimbTexture = builder.getBoolean("pick_limb_texture", true);
+            BBSSettings.limbTracks = builder.getBoolean("limb_tracks", true);
+            BBSSettings.originalKeyframeUI = builder.getBoolean("original_keyframe_ui", false);
+            BBSSettings.simplifiedKeyframeUI = builder.getBoolean("simplified_keyframe_ui", false);
+            BBSSettings.defaultInterpolation = builder.getInt("default_interpolation", 0);
+            builder.category("editor");
+            BBSSettings.editorSafeMarginsColor = builder.getInt("safe_margins_color", 0xcccc0000).colorAlpha();
+            BBSSettings.editorSafeMargins = builder.getBoolean("safe_margins", false);
+            BBSSettings.editorFlightFreeLook = builder.getBoolean("flight_free_look", false);
+            BBSSettings.editorClipTypeLabels = builder.getBoolean("clip_type_labels", false);
+            BBSSettings.editorReplaySprintParticles = builder.getBoolean("replay_sprint_particles", false);
+            BBSSettings.editorTimeMode = builder.getInt("time_mode", 0, 0, 2);
+            BBSSettings.editorTimeMode.modes(
+                UIKeys.CONFIG_EDITOR_TICKS_MODE,
+                UIKeys.CONFIG_EDITOR_SECONDS_MODE,
+                UIKeys.CONFIG_EDITOR_FRAMES_MODE
+            );
+            BBSSettings.editorTimeMode.postCallback((changed, flag) ->
+            {
+                int mode = BBSSettings.editorTimeMode.get();
+
+                if (mode == 0)
+                {
+                    if (BBSSettings.editorSeconds.get()) BBSSettings.editorSeconds.set(false);
+                    if (BBSSettings.editorFrames.get()) BBSSettings.editorFrames.set(false);
+                }
+                else if (mode == 1)
+                {
+                    if (!BBSSettings.editorSeconds.get()) BBSSettings.editorSeconds.set(true);
+                    if (BBSSettings.editorFrames.get()) BBSSettings.editorFrames.set(false);
+                }
+                else
+                {
+                    if (BBSSettings.editorSeconds.get()) BBSSettings.editorSeconds.set(false);
+                    if (!BBSSettings.editorFrames.get()) BBSSettings.editorFrames.set(true);
+                }
+            });
+
+            BBSSettings.editorSeconds.postCallback((changed, flag) ->
+            {
+                if (BBSSettings.editorSeconds.get())
+                {
+                    if (BBSSettings.editorTimeMode.get() != 1) BBSSettings.editorTimeMode.set(1);
+                    if (BBSSettings.editorFrames.get()) BBSSettings.editorFrames.set(false);
+                }
+                else if (!BBSSettings.editorFrames.get())
+                {
+                    if (BBSSettings.editorTimeMode.get() != 0) BBSSettings.editorTimeMode.set(0);
+                }
+            });
+            BBSSettings.editorFrames.postCallback((changed, flag) ->
+            {
+                if (BBSSettings.editorFrames.get())
+                {
+                    if (BBSSettings.editorTimeMode.get() != 2) BBSSettings.editorTimeMode.set(2);
+                    if (BBSSettings.editorSeconds.get()) BBSSettings.editorSeconds.set(false);
+                }
+                else if (!BBSSettings.editorSeconds.get())
+                {
+                    if (BBSSettings.editorTimeMode.get() != 0) BBSSettings.editorTimeMode.set(0);
+                }
+            });
+            builder.category("display");
+            BBSSettings.editorReplayHud = builder.getBoolean("replay_hud", false);
+            BBSSettings.editorReplayHudPosition = builder.getInt("replay_hud_position", 0, 0, 3);
+            BBSSettings.editorReplayHudDisplayName = builder.getBoolean("replay_hud_display_name", true);
+            builder.category("fluid_simulation");
+            BBSSettings.fluidRealisticModelInteraction = builder.getBoolean("realistic_model_interaction", false);
+            builder.category("model_blocks");
+            BBSSettings.modelBlockCategoriesPanelEnabled = builder.getBoolean("categories_panel_enabled", false);
+            builder.category("pose_track_selection");
+            BBSSettings.boneAnchoringEnabled = builder.getBoolean("bone_anchoring_enabled", true);
+            BBSSettings.anchorOverrideEnabled = builder.getBoolean("anchor_override_enabled", false);
+            BBSSettings.autoKeyframe = builder.getBoolean("auto_keyframe", false);
+            BBSSettings.poseBonesFilterMarked = builder.getBoolean("pose_bones_filter_marked", false);
+            BBSSettings.poseBonesFilterMarked.invisible();
+            BBSSettings.replayMarkedBonesOnly = builder.getBoolean("replay_marked_bones_only", false);
+            builder.category("replay_editor");
+            BBSSettings.editorReplayEditorTitleLimit = builder.getInt("replay_editor_title_limit", 12, 0, 64);
+        });
 
         BBSMod.events.post(new RegisterClientSettingsEvent());
 
         BBSSettings.language.postCallback((v, f) -> reloadLanguage(getLanguageKey()));
-        /* Reconfigurar las categorías de formularios cuando se cambie la visualización de estructuras */
-        BBSSettings.visualizeStructures.postCallback((v, f) -> {
-            getFormCategories().setup();
-        });
-        BBSSettings.editorSeconds.postCallback((v, f) ->
+
+        BBSSettings.editorTimeMode.postCallback((v, f) ->
         {
             if (dashboard != null && dashboard.getPanels().panel instanceof UIFilmPanel panel)
             {
@@ -386,14 +570,6 @@ public class BBSModClient implements ClientModInitializer
             UIKeys.ENGINE_KEYSTROKES_POSITION_TOP_LEFT
         );
 
-        /* Gizmo design modes: 0=Default (Gizmo.java), 1=CML, 2=Classic, 3=Blockbench */
-        BBSSettings.gizmoDesign.modes(
-            UIKeys.GIZMOS_DESIGN_DEFAULT,
-            UIKeys.GIZMOS_DESIGN_CML,
-            UIKeys.GIZMOS_DESIGN_CLASSIC,
-            UIKeys.GIZMOS_DESIGN_BLOCKBENCH
-        );
-
         UIKeys.C_KEYBIND_CATGORIES.load(KeyCombo.getCategoryKeys());
         UIKeys.C_KEYBIND_CATGORIES_TOOLTIP.load(KeyCombo.getCategoryKeys());
 
@@ -405,7 +581,6 @@ public class BBSModClient implements ClientModInitializer
 
         /* Keybinds */
         // ========== BBS PLAYER MOD - ALL KEYBINDS DISABLED ==========
-        // All keybinds disabled - films can only be controlled via server commands
         // keyDashboard = this.createKey("dashboard", GLFW.GLFW_KEY_0);
         // keyItemEditor = this.createKey("item_editor", GLFW.GLFW_KEY_HOME);
         // keyPlayFilm = this.createKey("play_film", GLFW.GLFW_KEY_RIGHT_CONTROL);
@@ -417,12 +592,11 @@ public class BBSModClient implements ClientModInitializer
         // keyDemorph = this.createKey("demorph", GLFW.GLFW_KEY_PERIOD);
         // keyTeleport = this.createKey("teleport", GLFW.GLFW_KEY_Y);
         // keyZoom = this.createKeyMouse("zoom", 2);
+        // keyToggleReplayHud = this.createKey("toggle_replay_hud", GLFW.GLFW_KEY_P);
         // ================================================================
 
         WorldRenderEvents.AFTER_ENTITIES.register((context) ->
         {
-            // Siempre renderizamos nuestros elementos después de las entidades.
-            // Bajo Iris, este punto mantiene las matrices correctas del mundo.
             BBSRendering.renderCoolStuff(context);
 
             if (BBSSettings.chromaSkyEnabled.get())
@@ -443,7 +617,7 @@ public class BBSModClient implements ClientModInitializer
                     stack.translate(0F, 0F, -d);
 
                     RenderSystem.enableDepthTest();
-                    BufferBuilder builder = new BufferBuilder(new BufferAllocator(1536), VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
+                    BufferBuilder builder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLES, VertexFormats.POSITION_COLOR);
 
                     float fov = MinecraftClient.getInstance().options.getFov().getValue();
                     float dd = d * (float) Math.pow(fov / 40F, 2F);
@@ -458,7 +632,16 @@ public class BBSModClient implements ClientModInitializer
 
                     RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
+                    Matrix4fStack mvStack = RenderSystem.getModelViewStack();
+                    mvStack.pushMatrix();
+                    mvStack.identity();
+                    RenderSystem.applyModelViewMatrix();
+
                     BufferRenderer.drawWithGlobalProgram(builder.end());
+
+                    mvStack.popMatrix();
+                    RenderSystem.applyModelViewMatrix();
+
                     RenderSystem.disableDepthTest();
 
                     stack.pop();
@@ -478,6 +661,7 @@ public class BBSModClient implements ClientModInitializer
         {
             dashboard = null;
             films = new Films();
+            setSelectedReplay(null);
 
             ClientNetwork.resetHandshake();
             films.reset();
@@ -487,6 +671,7 @@ public class BBSModClient implements ClientModInitializer
         ClientTickEvents.START_CLIENT_TICK.register((client) ->
         {
             BBSRendering.startTick();
+            TriggerBlockEntityRenderer.capturedTriggerBlocks.clear();
         });
 
         ClientTickEvents.END_WORLD_TICK.register((client) ->
@@ -547,7 +732,9 @@ public class BBSModClient implements ClientModInitializer
                 dashboard.setPanel(dashboard.getPanel(UIMorphingPanel.class));
             }
             while (keyDemorph.wasPressed()) ClientNetwork.sendPlayerForm(null);
-            while (keyTeleport.wasPressed()) this.keyTeleport(); */
+            while (keyTeleport.wasPressed()) this.keyTeleport();
+            while (keyToggleReplayHud.wasPressed()) BBSSettings.editorReplayHud.set(!BBSSettings.editorReplayHud.get());
+            */
             if (mc.player != null)
             {
                 // ========== BBS PLAYER MOD - DISABLED GUN ZOOM ==========
@@ -619,17 +806,51 @@ public class BBSModClient implements ClientModInitializer
         /* Network */
         ClientNetwork.setup();
 
+        /* Register addons from FabricLoader */
+        FabricLoader.getInstance()
+            .getEntrypointContainers("bbs-addon", BBSAddonMod.class)
+            .forEach((container) ->
+            {
+                net.fabricmc.loader.api.metadata.ModMetadata meta = container.getProvider().getMetadata();
+                String id = meta.getId();
+                String name = meta.getName();
+                String version = meta.getVersion().getFriendlyString();
+                String description = meta.getDescription();
+                List<String> authors = meta.getAuthors().stream().map(Person::getName).toList();
+                
+                Link icon = null;
+                Optional<String> iconPath = meta.getIconPath(64);
+                if (iconPath.isPresent())
+                {
+                    String path = iconPath.get();
+                    if (path.startsWith("assets/"))
+                    {
+                        String relative = path.substring("assets/".length());
+                        icon = new Link("mod_icons", relative);
+                    }
+                }
+                
+                ContactInformation contact = meta.getContact();
+                String website = contact.get("homepage").orElse("");
+                String issues = contact.get("issues").orElse("");
+                String source = contact.get("sources").orElse("");
+
+                registerAddon(new AddonInfo(id, name, version, description, authors, icon, website, issues, source));
+            });
+
         /* Entity renderers */
         EntityRendererRegistry.register(BBSMod.ACTOR_ENTITY, ActorEntityRenderer::new);
         EntityRendererRegistry.register(BBSMod.GUN_PROJECTILE_ENTITY, GunProjectileEntityRenderer::new);
 
-        BlockEntityRendererRegistryImpl.register(BBSMod.MODEL_BLOCK_ENTITY, ModelBlockEntityRenderer::new);
+        BlockEntityRendererRegistry.register(BBSMod.MODEL_BLOCK_ENTITY, ModelBlockEntityRenderer::new);
+        BlockEntityRendererRegistry.register(BBSMod.TRIGGER_BLOCK_ENTITY, TriggerBlockEntityRenderer::new);
 
         BuiltinItemRendererRegistry.INSTANCE.register(BBSMod.MODEL_BLOCK_ITEM, modelBlockItemRenderer);
         BuiltinItemRendererRegistry.INSTANCE.register(BBSMod.GUN_ITEM, gunItemRenderer);
 
         /* Create folders */
         BBSMod.getAudioFolder().mkdirs();
+        BBSMod.getAssetsPath("textures").mkdirs();
 
         for (String path : List.of("alex", "alex_simple", "steve", "steve_simple"))
         {

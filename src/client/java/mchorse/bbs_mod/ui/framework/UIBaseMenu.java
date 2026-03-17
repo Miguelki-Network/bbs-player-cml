@@ -1,8 +1,6 @@
 package mchorse.bbs_mod.ui.framework;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import mchorse.bbs_mod.BBSSettings;
-import mchorse.bbs_mod.gizmos.BoneGizmoSystem;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.framework.elements.IUIElement;
 import mchorse.bbs_mod.ui.framework.elements.IViewport;
@@ -46,19 +44,12 @@ public abstract class UIBaseMenu
         this.main.full(this.viewport);
         this.overlay = new UIElement();
         this.overlay.full(this.viewport);
-        this.overlay.keys().register(Keys.TRANSFORMATIONS_TOGGLE_AXES, () -> renderAxes = !renderAxes);
-        /* Alternar modo de gizmo desde el overlay (solo cuando los gizmos están activos) */
-        this.overlay.keys().register(Keys.GIZMOS_TOGGLE_ENABLED, () -> {
-            if (BBSSettings.gizmos.get() && BBSSettings.gizmoDesign.get() != 0)
-            {
-                BoneGizmoSystem.get().cycleMode(true);
-            }
-        });
         this.root.add(this.main, this.overlay);
 
         UIElement popka = new UIElement();
 
         popka.keys().register(Keys.KEYBINDS, () -> this.context.toggleKeybinds());
+        popka.keys().register(Keys.TRANSFORMATIONS_TOGGLE_AXES, () -> renderAxes = !renderAxes);
         this.root.add(popka);
 
         this.context.keybinds.relative(this.viewport).wh(0.5F, 1F);

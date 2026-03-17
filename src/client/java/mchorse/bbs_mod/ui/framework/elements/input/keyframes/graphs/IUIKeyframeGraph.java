@@ -16,9 +16,12 @@ import java.util.List;
 
 public interface IUIKeyframeGraph
 {
-    public static final int TOP_MARGIN = 25;
+    public static final int TOP_MARGIN = 15;
+    public static final int SIDEBAR_WIDTH = 140;
 
     public void resetView();
+
+    public UIKeyframeSheet getLastSheet();
 
     public List<UIKeyframeSheet> getSheets();
 
@@ -77,11 +80,29 @@ public interface IUIKeyframeGraph
 
     public default UIKeyframeSheet getSheet(Keyframe keyframe)
     {
+        if (keyframe == null)
+        {
+            return null;
+        }
+
         KeyframeChannel channel = (KeyframeChannel) keyframe.getParent();
 
         for (UIKeyframeSheet sheet : this.getSheets())
         {
             if (sheet.channel == channel)
+            {
+                return sheet;
+            }
+        }
+
+        return null;
+    }
+
+    public default UIKeyframeSheet getSheet(String id)
+    {
+        for (UIKeyframeSheet sheet : this.getSheets())
+        {
+            if (sheet.id.equals(id))
             {
                 return sheet;
             }
@@ -102,7 +123,15 @@ public interface IUIKeyframeGraph
 
         if (value == null)
         {
-            if (segment != null)
+            if ("shadow_size".equals(sheet.id))
+            {
+                value = 0.5D;
+            }
+            else if ("shadow_opacity".equals(sheet.id))
+            {
+                value = 1D;
+            }
+            else if (segment != null)
             {
                 value = segment.createInterpolated();
                 extra = segment.a;
@@ -157,6 +186,9 @@ public interface IUIKeyframeGraph
     {
         this.pickKeyframe(this.getSelected());
     }
+
+    public default void onCallback(Keyframe keyframe)
+    {}
 
     public void pickKeyframe(Keyframe keyframe);
 

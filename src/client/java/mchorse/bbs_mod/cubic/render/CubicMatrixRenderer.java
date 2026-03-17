@@ -16,7 +16,7 @@ public class CubicMatrixRenderer implements ICubicRenderer
     public List<Matrix4f> origins;
     public String target;
 
-    public CubicMatrixRenderer(Model model, String target)
+    public CubicMatrixRenderer(Model model)
     {
         this.matrices = new ArrayList<>();
         this.origins = new ArrayList<>();
@@ -33,9 +33,11 @@ public class CubicMatrixRenderer implements ICubicRenderer
     public void applyGroupTransformations(MatrixStack stack, ModelGroup group)
     {
         ICubicRenderer.translateGroup(stack, group);
+
+        this.origins.get(group.index).set(stack.peek().getPositionMatrix());
+
         ICubicRenderer.moveToGroupPivot(stack, group);
 
-        /* Capture matrix at the group's pivot before rotation/scale */
         this.origins.get(group.index).set(stack.peek().getPositionMatrix());
 
         if (!Objects.equals(group.id, this.target))

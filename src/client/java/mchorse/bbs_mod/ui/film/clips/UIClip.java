@@ -16,6 +16,7 @@ import mchorse.bbs_mod.camera.clips.misc.AudioClientClip;
 import mchorse.bbs_mod.camera.clips.misc.CurveClientClip;
 import mchorse.bbs_mod.camera.clips.misc.SubtitleClip;
 import mchorse.bbs_mod.camera.clips.misc.TrackerClientClip;
+import mchorse.bbs_mod.camera.clips.misc.VideoClip;
 import mchorse.bbs_mod.camera.clips.modifiers.AngleClip;
 import mchorse.bbs_mod.camera.clips.modifiers.DollyZoomClip;
 import mchorse.bbs_mod.camera.clips.modifiers.DragClip;
@@ -99,6 +100,7 @@ public abstract class UIClip <T extends Clip> extends UIElement
         register(OrbitClip.class, UIOrbitClip::new);
         register(RemapperClip.class, UIRemapperClip::new);
         register(AudioClientClip.class, UIAudioClip::new);
+        register(VideoClip.class, UIVideoClip::new);
         register(SubtitleClip.class, UISubtitleClip::new);
         register(CurveClientClip.class, UICurveClip::new);
         register(DollyZoomClip.class, UIDollyZoomClip::new);
@@ -160,12 +162,12 @@ public abstract class UIClip <T extends Clip> extends UIElement
         this.title.tooltip(UIKeys.CAMERA_PANELS_TITLE_TOOLTIP);
         this.layer = new UITrackpad((v) -> this.editor.editMultiple(this.clip.layer, v.intValue()));
         this.layer.limit(0, Integer.MAX_VALUE, true).tooltip(UIKeys.CAMERA_PANELS_LAYER);
-        this.tick = new UITrackpad((v) -> this.editor.editMultiple(this.clip.tick, TimeUtils.fromTime(v)));
+        this.tick = new UITrackpad((v) -> this.editor.editMultiple(this.clip.tick, (int) TimeUtils.fromTime(v)));
         this.tick.limit(0, Integer.MAX_VALUE, true).tooltip(UIKeys.CAMERA_PANELS_TICK);
         this.duration = new UITrackpad((v) ->
         {
-            this.editor.editMultiple(this.clip.duration, TimeUtils.fromTime(v));
-            this.updateDuration(TimeUtils.fromTime(v));
+            this.editor.editMultiple(this.clip.duration, (int) TimeUtils.fromTime(v));
+            this.updateDuration((int) TimeUtils.fromTime(v));
         });
         this.duration.limit(1, Integer.MAX_VALUE, true).tooltip(UIKeys.CAMERA_PANELS_DURATION);
         this.envelope = new UIEnvelope(this);

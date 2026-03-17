@@ -142,7 +142,19 @@ public class UIClips extends UIElement
         this.delegate = delegate;
         this.factory = factory;
 
-        this.embeddedClose = new UIIcon(Icons.CLOSE, (b) -> this.embedView(null));
+        this.embeddedClose = new UIIcon(Icons.CLOSE, (b) -> this.embedView(null))
+        {
+            @Override
+            protected void renderSkin(UIContext context)
+            {
+                if (UIClips.this.embedded != null && UIClips.this.delegate.getClip() instanceof KeyframeClip)
+                {
+                    this.area.render(context.batcher, Colors.setA(Colors.RED, 0.5F));
+                }
+
+                super.renderSkin(context);
+            }
+        };
         this.embeddedClose.relative(this);
 
         this.context((menu) ->
@@ -1206,7 +1218,13 @@ public class UIClips extends UIElement
         }
 
         this.vertical.mouseReleased(context);
+        this.resetStates();
 
+        return super.subMouseReleased(context);
+    }
+
+    private void resetStates()
+    {
         if (this.selecting)
         {
             this.pickLastSelectedClip();
@@ -1223,8 +1241,8 @@ public class UIClips extends UIElement
         this.otherClips = Collections.emptyList();
         this.snappingPoints.clear();
         this.grabbedData.clear();
-
-        return super.subMouseReleased(context);
+        
+        this.vertical.dragging = false;
     }
 
     @Override
@@ -1259,6 +1277,20 @@ public class UIClips extends UIElement
 
     private void handleInput(int mouseX, int mouseY)
     {
+        if ((this.scrubbing || this.selecting || this.grabbing || this.selectingLoop == 0) && !Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_1))
+        {
+            this.resetStates();
+
+            return;
+        }
+
+        if (this.selectingLoop == 1 && !Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_2))
+        {
+            this.resetStates();
+
+            return;
+        }
+
         if (this.scrubbing)
         {
             this.delegate.setCursor(this.fromGraphX(mouseX));
@@ -1510,6 +1542,13 @@ public class UIClips extends UIElement
     {
         if (this.scrolling)
         {
+            if (!Window.isMouseButtonPressed(GLFW.GLFW_MOUSE_BUTTON_3))
+            {
+                this.resetStates();
+
+                return;
+            }
+
             this.scale.setShift(this.scale.getShift() - (mouseX - this.lastX) / this.scale.getZoom());
             this.vertical.scrollBy(this.lastY - mouseY);
             this.vertical.clamp();

@@ -9,6 +9,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import mchorse.bbs_mod.bay4lly.SkinCommands;
 import mchorse.bbs_mod.blocks.entities.ModelBlockEntity;
 import mchorse.bbs_mod.data.DataToString;
 import mchorse.bbs_mod.data.types.BaseType;
@@ -70,6 +71,7 @@ public class BBSCommands
         // registerCheatsCommand(bbs, environment);
         // registerBoomCommand(bbs, environment, hasPermissions);
         // registerStructureSaveCommand(bbs, environment, hasPermissions);
+        // SkinCommands.attach(bbs, hasPermissions);
         // ================================================================
 
         dispatcher.register(bbs);
@@ -522,7 +524,7 @@ public class BBSCommands
 
         try
         {
-        structureTemplate = structureTemplateManager.getTemplateOrBlank(Identifier.of(name));
+            structureTemplate = structureTemplateManager.getTemplateOrBlank(Identifier.of(name));
         }
         catch (InvalidIdentifierException e)
         {
@@ -537,7 +539,7 @@ public class BBSCommands
 
         try
         {
-        if (structureTemplateManager.saveTemplate(Identifier.of(name)))
+            if (structureTemplateManager.saveTemplate(Identifier.of(name)))
             {
                 return 1;
             }

@@ -1,6 +1,7 @@
 package mchorse.bbs_mod.ui.framework.elements.input;
 
 import mchorse.bbs_mod.data.types.ListType;
+import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.graphics.window.Window;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.ui.Keys;
@@ -142,6 +143,14 @@ public abstract class UITransform extends UIElement
 
         this.add(UI.row(this.iconP, this.px, this.py, this.pz));
 
+        if (BBSSettings.disablePivotTransform.get())
+        {
+            this.iconP.removeFromParent();
+            this.px.removeFromParent();
+            this.py.removeFromParent();
+            this.pz.removeFromParent();
+        }
+
         this.context((menu) ->
         {
             ListType transforms = Window.getClipboardList();
@@ -157,13 +166,42 @@ public abstract class UITransform extends UIElement
             {
                 final ListType innerList = transforms;
 
-                menu.action(Icons.PASTE, UIKeys.TRANSFORMS_CONTEXT_PASTE, () -> this.pasteAll(innerList));
-                menu.action(Icons.ALL_DIRECTIONS, UIKeys.TRANSFORMS_CONTEXT_PASTE_TRANSLATION, () -> this.pasteTranslation(this.getVector(innerList, 0)));
-                menu.action(Icons.MAXIMIZE, UIKeys.TRANSFORMS_CONTEXT_PASTE_SCALE, () -> this.pasteScale(this.getVector(innerList, 3)));
-                menu.action(Icons.REFRESH, UIKeys.TRANSFORMS_CONTEXT_PASTE_ROTATION, () -> this.pasteRotation(this.getVector(innerList, 6)));
+                menu.action(Icons.MORE, UIKeys.TRANSFORMS_CONTEXT_PASTES, () ->
+                {
+                    UIContext context = this.getContext();
+
+                    if (context != null)
+                    {
+                        context.replaceContextMenu((pastes) ->
+                        {
+                            pastes.action(Icons.PASTE, UIKeys.TRANSFORMS_CONTEXT_PASTE, () -> this.pasteAll(innerList));
+                            pastes.action(Icons.ALL_DIRECTIONS, UIKeys.TRANSFORMS_CONTEXT_PASTE_TRANSLATION, () -> this.pasteTranslation(this.getVector(innerList, 0)));
+                            pastes.action(Icons.MAXIMIZE, UIKeys.TRANSFORMS_CONTEXT_PASTE_SCALE, () -> this.pasteScale(this.getVector(innerList, 3)));
+                            pastes.action(Icons.REFRESH, UIKeys.TRANSFORMS_CONTEXT_PASTE_ROTATION, () -> this.pasteRotation(this.getVector(innerList, 6)));
+                            pastes.action(Icons.REFRESH, UIKeys.TRANSFORMS_CONTEXT_PASTE_ROTATION2, () -> this.pasteRotation2(this.getVector(innerList, 9)));
+                            pastes.autoKeys();
+                        });
+                    }
+                });
             }
 
-            menu.action(Icons.CLOSE, UIKeys.TRANSFORMS_CONTEXT_RESET, this::reset);
+            menu.action(Icons.MORE, UIKeys.TRANSFORMS_CONTEXT_RESETS, () ->
+            {
+                UIContext context = this.getContext();
+
+                if (context != null)
+                {
+                    context.replaceContextMenu((resets) ->
+                    {
+                        resets.action(Icons.ALL_DIRECTIONS, UIKeys.TRANSFORMS_CONTEXT_RESET_TRANSLATION, this::resetTranslation);
+                        resets.action(Icons.MAXIMIZE, UIKeys.TRANSFORMS_CONTEXT_RESET_SCALE, this::resetScale);
+                        resets.action(Icons.REFRESH, UIKeys.TRANSFORMS_CONTEXT_RESET_ROTATION, this::resetRotation);
+                        resets.action(Icons.REFRESH, UIKeys.TRANSFORMS_CONTEXT_RESET_ROTATION2, this::resetRotation2);
+                        resets.action(Icons.CLOSE, UIKeys.TRANSFORMS_CONTEXT_RESET, this::reset);
+                        resets.autoKeys();
+                    });
+                }
+            });
         });
 
         this.wh(190, 90);
@@ -474,7 +512,32 @@ public abstract class UITransform extends UIElement
         this.fillSetS(1, 1, 1);
         this.fillSetR(0, 0, 0);
         this.fillSetR2(0, 0, 0);
-        this.fillSetP(0, 0, 0);
+
+        if (!BBSSettings.disablePivotTransform.get())
+        {
+            this.fillSetP(0, 0, 0);
+        }
+    }
+
+    protected void resetTranslation()
+    {
+        this.fillSetT(0, 0, 0);
+    }
+
+    protected void resetScale()
+    {
+        this.fillSetS(1, 1, 1);
+    }
+
+    protected void resetRotation()
+    {
+        this.fillSetR(0, 0, 0);
+        this.fillSetR2(0, 0, 0);
+    }
+
+    protected void resetRotation2()
+    {
+        this.fillSetR2(0, 0, 0);
     }
 
     @Override

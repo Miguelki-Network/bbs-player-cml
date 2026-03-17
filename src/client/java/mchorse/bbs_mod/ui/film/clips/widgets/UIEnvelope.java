@@ -1,7 +1,6 @@
 package mchorse.bbs_mod.ui.film.clips.widgets;
 
 import mchorse.bbs_mod.camera.utils.TimeUtils;
-import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.clips.UIClip;
 import mchorse.bbs_mod.ui.film.replays.UIReplaysEditor;
@@ -94,7 +93,7 @@ public class UIEnvelope extends UIElement
         this.channel = new UIKeyframeEditor((consumer) -> new UIFilmKeyframes(this.panel.editor, consumer));
         this.channel.view.backgroundRenderer((context) ->
         {
-            UIReplaysEditor.renderBackground(context, this.channel.view, (Clips) this.panel.clip.getParent(), this.panel.clip.tick.get());
+            UIReplaysEditor.renderBackground(context, this.channel.view, (Clips) this.panel.clip.getParent(), this.panel.clip.tick.get(), this.panel.clip);
         });
         this.channel.view.single().duration(() -> this.panel.clip.duration.get());
 
@@ -132,7 +131,6 @@ public class UIEnvelope extends UIElement
     public void initiate()
     {
         this.channel.view.resetView();
-        this.channel.updateConverter();
 
         TimeUtilsClient.configure(this.fadeIn, 0);
         TimeUtilsClient.configure(this.fadeOut, 0);

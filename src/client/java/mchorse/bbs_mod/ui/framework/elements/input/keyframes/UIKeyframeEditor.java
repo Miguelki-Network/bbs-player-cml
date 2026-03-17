@@ -5,12 +5,12 @@ import mchorse.bbs_mod.data.DataStorageUtils;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
-import mchorse.bbs_mod.ui.film.utils.CameraAxisConverter;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIKeyframeFactory;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIPoseKeyframeFactory;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UITransformKeyframeFactory;
 import mchorse.bbs_mod.utils.Pair;
+import mchorse.bbs_mod.utils.StringUtils;
 import mchorse.bbs_mod.utils.colors.Colors;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
@@ -22,7 +22,6 @@ import java.util.function.Function;
 public class UIKeyframeEditor extends UIElement
 {
     public static final int[] COLORS = {Colors.RED, Colors.GREEN, Colors.BLUE, Colors.CYAN, Colors.MAGENTA, Colors.YELLOW, Colors.LIGHTEST_GRAY & 0xffffff, Colors.DEEP_PINK};
-    public static final CameraAxisConverter CONVERTER = new CameraAxisConverter();
 
     public UIKeyframes view;
     public UIKeyframeFactory editor;
@@ -32,7 +31,6 @@ public class UIKeyframeEditor extends UIElement
     public UIKeyframeEditor(Function<Consumer<Keyframe>, UIKeyframes> factory)
     {
         this.view = factory.apply(this::pickKeyframe);
-
         this.view.changed(() ->
         {
             if (this.editor != null)
@@ -85,11 +83,6 @@ public class UIKeyframeEditor extends UIElement
         this.resize();
     }
 
-    public void updateConverter()
-    {
-        this.view.axisConverter(CONVERTER);
-    }
-
     public void setChannel(KeyframeChannel channel, int color)
     {
         this.view.removeAllSheets();
@@ -136,48 +129,74 @@ public class UIKeyframeEditor extends UIElement
         String bone = null;
         boolean local = false;
 
-        if (editor instanceof UIPoseKeyframeFactory pose)
+        if (editor instanceof UIPoseKeyframeFactory || editor instanceof UITransformKeyframeFactory)
         {
             UIKeyframeSheet sheet = this.getSheet(editor.getKeyframe());
-            String currentFirst = pose.poseEditor.groups.getCurrentFirst();
 
             if (sheet != null)
             {
-                boolean isPose = sheet.id.endsWith("pose") || sheet.id.contains("pose_overlay");
+                String id = StringUtils.fileName(sheet.id);
+                int colon = id.indexOf(':');
+                String propertyId = colon != -1 ? id.substring(0, colon) : id;
+                String boneName = colon != -1 ? id.substring(colon + 1) : null;
+
+                boolean isPose = propertyId.equals("pose") || propertyId.startsWith("pose_overlay");
 
                 if (isPose)
                 {
-                    String targetBone = sheet.anchoredBone != null && !sheet.anchoredBone.isEmpty() ? sheet.anchoredBone : currentFirst;
+                    String targetBone = boneName;
 
-                    /* Si el id incluye una ruta de propiedad (p.ej. formPath/pose o formPath/pose_overlayX),
-                     * mantener el prefijo del formulario para ubicar correctamente el hueso en el renderer. */
+                    if (targetBone == null)
+                    {
+                        if (editor instanceof UIPoseKeyframeFactory pose)
+                        {
+                            targetBone = pose.poseEditor.getCurrentBone();
+
+                            if (targetBone == null || targetBone.isEmpty())
+                            {
+                                targetBone = pose.poseEditor.groups.list.getCurrentFirst();
+                            }
+                        }
+
+                        if (sheet.anchoredBone != null && !sheet.anchoredBone.isEmpty())
+                        {
+                            targetBone = sheet.anchoredBone;
+                        }
+                    }
+
+                    /* If the ID includes a property path (e.g., formPath/pose or formPath/pose_overlayX),
+                     * retain the form prefix to correctly position the bone in the renderer.*/
                     if (sheet.id.contains("/pose") || sheet.id.contains("/pose_overlay"))
                     {
-                        bone = sheet.id.substring(0, sheet.id.lastIndexOf('/') + 1) + targetBone;
+                        int lastSlash = sheet.id.lastIndexOf('/');
+                        String prefix = sheet.id.substring(0, lastSlash);
+
+                        bone = targetBone == null || targetBone.isEmpty() ? prefix : prefix + "/" + targetBone;
                     }
                     else
                     {
                         bone = targetBone;
                     }
 
-                    local = pose.poseEditor.transform.isLocal();
+                    if (editor instanceof UIPoseKeyframeFactory pose)
+                    {
+                        local = pose.poseEditor.transform.isLocal();
+                    }
+                    else if (editor instanceof UITransformKeyframeFactory transform)
+                    {
+                        local = transform.transform.isLocal();
+                    }
                 }
-            }
-        }
-        else if (editor instanceof UITransformKeyframeFactory)
-        {
-            UIKeyframeSheet sheet = this.getSheet(editor.getKeyframe());
+                else if (propertyId.equals("transform") || propertyId.startsWith("transform_overlay"))
+                {
+                    int lastSlash = sheet.id.lastIndexOf('/');
 
-            if (sheet != null)
-            {
-                if (sheet.id.endsWith("transform"))
-                {
-                    bone = sheet.id.endsWith("/transform") ? sheet.id.substring(0, sheet.id.lastIndexOf('/')) : "";
-                }
-                else if (sheet.id.contains("transform_overlay"))
-                {
-                    int slash = sheet.id.lastIndexOf('/');
-                    bone = slash >= 0 ? sheet.id.substring(0, slash) : "";
+                    bone = lastSlash >= 0 ? sheet.id.substring(0, lastSlash) : "";
+
+                    if (editor instanceof UITransformKeyframeFactory transform)
+                    {
+                        local = transform.transform.isLocal();
+                    }
                 }
             }
         }
