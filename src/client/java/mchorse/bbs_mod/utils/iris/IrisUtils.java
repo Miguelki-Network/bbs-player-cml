@@ -1,12 +1,14 @@
 package mchorse.bbs_mod.utils.iris;
 
-import joptsimple.internal.Strings;
 import mchorse.bbs_mod.BBSModClient;
 import mchorse.bbs_mod.graphics.texture.Texture;
 import mchorse.bbs_mod.graphics.texture.TextureManager;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.utils.CollectionUtils;
 import mchorse.bbs_mod.utils.DataPath;
+
+import net.minecraft.client.texture.AbstractTexture;
+
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
@@ -24,8 +26,10 @@ import net.irisshaders.iris.uniforms.custom.cached.IntCachedUniform;
 import net.irisshaders.iris.vertices.NormI8;
 import net.irisshaders.iris.vertices.NormalHelper;
 import net.irisshaders.iris.vertices.views.TriView;
-import net.minecraft.client.texture.AbstractTexture;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,14 +37,40 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.lang.reflect.Constructor;
+
+import joptsimple.internal.Strings;
 
 public class IrisUtils
 {
     private static Set<Texture> textureSet = new HashSet<>();
+    private static Map<Integer, PBRIntensity> trackedPBRIntensities = new HashMap<>();
+    private static final ThreadLocal<PBRIntensity> activePBRIntensity = new ThreadLocal<>();
     private static ShaderProperties properties;
+
+    private static class PBRIntensity
+    {
+        public float normal = 1F;
+        public float specular = 1F;
+
+        public PBRIntensity()
+        {}
+
+        public PBRIntensity(float normal, float specular)
+        {
+            this.normal = normal;
+            this.specular = specular;
+        }
+
+        public PBRIntensity(PBRIntensity other)
+        {
+            this(other.normal, other.specular);
+        }
+
+        public boolean sameAs(PBRIntensity other)
+        {
+            return other != null && Math.abs(this.normal - other.normal) < 0.0001F && Math.abs(this.specular - other.specular) < 0.0001F;
+        }
+    }
 
     public static void setShaderProperties(ShaderProperties shaderProperties)
     {
@@ -263,8 +293,8 @@ public class IrisUtils
                             Link normalKey = helper.createPrefixedCopy(wrapper.texture, "_n.png");
                             Link specularKey = helper.createPrefixedCopy(wrapper.texture, "_s.png");
 
-                            IrisTextureWrapper normalWrapper = new IrisTextureWrapper(normalKey, (AbstractTexture) defaults[0], wrapper.index);
-                            IrisTextureWrapper specWrapper = new IrisTextureWrapper(specularKey, (AbstractTexture) defaults[1], wrapper.index);
+                            IrisTextureWrapper normalWrapper = new IrisTextureWrapper(normalKey, (AbstractTexture) defaults[0], wrapper.index, wrapper.normalIntensity, wrapper.specularIntensity, IrisTextureWrapper.PBRMapType.NORMAL);
+                            IrisTextureWrapper specWrapper = new IrisTextureWrapper(specularKey, (AbstractTexture) defaults[1], wrapper.index, wrapper.normalIntensity, wrapper.specularIntensity, IrisTextureWrapper.PBRMapType.SPECULAR);
 
                             if (acceptNormal != null) acceptNormal.invoke(consumer, normalWrapper);
                             if (acceptSpecular != null) acceptSpecular.invoke(consumer, specWrapper);
@@ -294,8 +324,10 @@ public class IrisUtils
     {
         TextureManager textures = BBSModClient.getTextures();
         Texture error = textures.getError();
+        PBRIntensity active = activePBRIntensity.get();
+        PBRIntensity current = active == null ? new PBRIntensity(1F, 1F) : new PBRIntensity(active);
 
-        if (texture != error && !textureSet.contains(texture))
+        if (texture != error)
         {
             Link key = CollectionUtils.getKey(textures.textures, texture);
 
@@ -311,6 +343,15 @@ public class IrisUtils
                 if (texture.getParent() != null)
                 {
                     index = texture.getParent().textures.indexOf(texture);
+                }
+
+                PBRIntensity tracked = trackedPBRIntensities.get(texture.id);
+
+                if (textureSet.contains(texture) && tracked != null && tracked.sameAs(current))
+                {
+                    textureSet.add(texture);
+
+                    return;
                 }
 
                 try
@@ -360,17 +401,43 @@ public class IrisUtils
 
                     if (trackMethod != null)
                     {
-                        trackMethod.invoke(tracker, texture.id, new IrisTextureWrapper(key, index));
+                        trackMethod.invoke(tracker, texture.id, new IrisTextureWrapper(key, index, current.normal, current.specular));
                     }
                 }
                 catch (Throwable t)
                 {
                     System.err.println("[BBS] TextureTracker not available or changed; skipping tracking: " + t);
                 }
+
+                trackedPBRIntensities.put(texture.id, current);
             }
 
             textureSet.add(texture);
         }
+    }
+
+    public static void setPBRTextureIntensity(float normalIntensity, float specularIntensity)
+    {
+        activePBRIntensity.set(new PBRIntensity(normalIntensity, specularIntensity));
+    }
+
+    public static void clearPBRTextureIntensity()
+    {
+        activePBRIntensity.remove();
+    }
+
+    public static float getActivePBRNormalIntensity()
+    {
+        PBRIntensity intensity = activePBRIntensity.get();
+
+        return intensity == null ? 1F : intensity.normal;
+    }
+
+    public static float getActivePBRSpecularIntensity()
+    {
+        PBRIntensity intensity = activePBRIntensity.get();
+
+        return intensity == null ? 1F : intensity.specular;
     }
 
     public static boolean isShaderPackEnabled()

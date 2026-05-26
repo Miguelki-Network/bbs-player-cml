@@ -1,31 +1,35 @@
 package mchorse.bbs_mod.forms.renderers;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import mchorse.bbs_mod.client.BBSShaders;
 import mchorse.bbs_mod.forms.CustomVertexConsumerProvider;
 import mchorse.bbs_mod.forms.FormUtilsClient;
 import mchorse.bbs_mod.forms.forms.LabelForm;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.utils.FontRenderer;
+import mchorse.bbs_mod.utils.FontUtils;
 import mchorse.bbs_mod.utils.MatrixStackUtils;
 import mchorse.bbs_mod.utils.StringUtils;
+import mchorse.bbs_mod.utils.TextureFont;
 import mchorse.bbs_mod.utils.colors.Color;
 import mchorse.bbs_mod.utils.joml.Vectors;
-import mchorse.bbs_mod.utils.FontUtils;
-import mchorse.bbs_mod.utils.TextureFont;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.render.Tessellator;
-import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
+
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+
+import java.awt.Font;
 import java.util.List;
 
 public class LabelFormRenderer extends FormRenderer<LabelForm>
@@ -218,9 +222,9 @@ public class LabelFormRenderer extends FormRenderer<LabelForm>
         
         if (!fontName.isEmpty())
         {
-            int style = java.awt.Font.PLAIN;
-            if (this.form.fontWeight.get() >= 700) style |= java.awt.Font.BOLD;
-            if (this.form.fontStyle.get() >= 1) style |= java.awt.Font.ITALIC;
+            int style = Font.PLAIN;
+            if (this.form.fontWeight.get() >= 700) style |= Font.BOLD;
+            if (this.form.fontStyle.get() >= 1) style |= Font.ITALIC;
             
             customFont = FontUtils.getFont(fontName, style);
         }
@@ -325,9 +329,9 @@ public class LabelFormRenderer extends FormRenderer<LabelForm>
         
         if (!fontName.isEmpty())
         {
-            int style = java.awt.Font.PLAIN;
-            if (this.form.fontWeight.get() >= 700) style |= java.awt.Font.BOLD;
-            if (this.form.fontStyle.get() >= 1) style |= java.awt.Font.ITALIC;
+            int style = Font.PLAIN;
+            if (this.form.fontWeight.get() >= 700) style |= Font.BOLD;
+            if (this.form.fontStyle.get() >= 1) style |= Font.ITALIC;
             
             customFont = FontUtils.getFont(fontName, style);
         }
@@ -365,8 +369,10 @@ public class LabelFormRenderer extends FormRenderer<LabelForm>
         int lineHeight = (int) (fh + this.form.lineHeight.get());
         int totalHeight = (lines.size() - 1) * lineHeight + fh - 2;
 
-        int x = (int) (-w * this.form.anchorX.get());
+        float anchorX = this.form.anchorX.get();
+        int x = (int) (-w * anchorX);
         int y = (int) (-totalHeight * this.form.anchorY.get());
+        int shadowY = y;
 
         Color shadowColor = this.form.shadowColor.get().copy();
         Color color = this.form.color.get().copy();
@@ -380,14 +386,25 @@ public class LabelFormRenderer extends FormRenderer<LabelForm>
         shadowColor.a *= this.nametagAlpha;
         
         int align = this.form.textAlign.get(); // 0: Left, 1: Center, 2: Right
+        boolean anchorLines = this.form.anchorLines.get();
 
         for (String line : lines)
         {
             int lw = customFont != null ? customFont.getWidth(line, letterSpacing) : renderer.getWidth(line) - 1;
             int lx = x;
-            
-            if (align == 1) lx = x + (w - lw) / 2;
-            else if (align == 2) lx = x + (w - lw);
+
+            if (anchorLines)
+            {
+                lx = (int) (-lw * anchorX);
+            }
+            else if (align == 1)
+            {
+                lx = x + (w - lw) / 2;
+            }
+            else if (align == 2)
+            {
+                lx = x + (w - lw);
+            }
 
             this.renderTextShadow(context, consumers, renderer, customFont, line, lx, y, letterSpacing, light, shadowColor);
             
@@ -456,7 +473,7 @@ public class LabelFormRenderer extends FormRenderer<LabelForm>
 
         consumers.draw();
 
-        this.renderShadow(context, x, y, w, totalHeight);
+        this.renderShadow(context, x, shadowY, w, totalHeight);
     }
 
     private void renderShadow(FormRenderingContext context, int x, int y, int w, int h)

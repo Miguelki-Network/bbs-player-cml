@@ -1,6 +1,6 @@
-# Creating Addons for BBS Mod
+# Creating Addons for BBS CML EDITION
 
-This comprehensive guide explains how to create addons for the BBS Mod. The addon system allows you to extend the mod's functionality by adding new forms, clips, dashboard panels, custom Molang functions, and more, without needing to modify the core mod code or use complex Mixins.
+This comprehensive guide explains how to create addons for the BBS CML EDITION. The addon system allows you to extend the mod's functionality by adding new forms, clips, dashboard panels, custom Molang functions, model loaders, and more, without needing to modify the core mod code or use complex Mixins.
 
 ## Table of Contents
 
@@ -222,6 +222,23 @@ event.registerRenderer(MyForm.class, MyFormRenderer::new);
 event.registerPanel(MyForm.class, UIMyFormPanel::new);
 ```
 
+### `registerModelLoaders(RegisterModelLoadersEvent event)`
+Registers custom model formats for `models/<id>/...` loading.
+
+```java
+@Override
+protected void registerModelLoaders(RegisterModelLoadersEvent event)
+{
+    event.registerLoader(new MyFormatModelLoader());
+    event.registerRelodableSuffix(".myformat");
+}
+```
+
+Notes:
+- `registerLoader(...)` appends your `IModelLoader` to the model loader chain.
+- `registerRelodableSuffix(...)` enables hot-reload invalidation for matching files.
+- If your loader reads additional companion files, register all relevant suffixes.
+
 ### `registerL10n(RegisterL10nEvent event)`
 Registers translation files.
 ```java
@@ -257,6 +274,31 @@ Registers ray tracing extensions.
 Registers stencil effects.
 
 ## Advanced Topics
+
+### Customizing Replay Tracks
+
+You can customize the visual appearance of property tracks in the Replay Editor (Timeline) by registering custom colors and icons. This is useful when your addon adds new animatable properties to forms.
+
+To register a color or icon, call the static methods in `UIReplaysEditor` during your client-side initialization:
+
+```java
+import mchorse.bbs_mod.ui.film.replays.UIReplaysEditor;
+import mchorse.bbs_mod.ui.utils.icons.Icons;
+
+// In your client addon initialization
+public void init() {
+    // Register a custom color (0xRRGGBB)
+    UIReplaysEditor.registerColor("Halo", 0xFFFFD3);
+    UIReplaysEditor.registerColor("Horse", 0xFF1413);
+    
+    // Register a custom icon
+    UIReplaysEditor.registerIcon("Photon", Icons.FADING);
+    UIReplaysEditor.registerIcon("Sun", Icons.SUN);
+    UIReplaysEditor.registerIcon("fog", Icons.SPRAY);
+}
+```
+
+*Note: The ID should match the property name used in your Form.*
 
 ### Custom UI Components
 

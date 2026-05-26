@@ -8,10 +8,11 @@ import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.events.ModelBlockEntityUpdateCallback;
 import mchorse.bbs_mod.forms.entities.IEntity;
 import mchorse.bbs_mod.forms.entities.StubEntity;
-import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.BillboardForm;
+import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.LightForm;
 import mchorse.bbs_mod.resources.Link;
+
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -22,6 +23,7 @@ import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.registry.RegistryWrapper.WrapperLookup;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+
 import org.jetbrains.annotations.Nullable;
 
 public class ModelBlockEntity extends BlockEntity
@@ -43,6 +45,12 @@ public class ModelBlockEntity extends BlockEntity
         BlockPos pos = this.getPos();
         Form form = this.getProperties().getForm();
         String s = "(" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ")";
+        String customName = this.getProperties().getName();
+
+        if (!customName.isEmpty())
+        {
+            return s + " " + customName;
+        }
 
         if (form != null)
         {
@@ -223,9 +231,9 @@ public class ModelBlockEntity extends BlockEntity
                 BlockPos pos = this.getPos();
                 BlockState state = this.world.getBlockState(pos);
 
-                if (state.getBlock() instanceof net.minecraft.block.Block)
+                if (state.getBlock() instanceof Block)
                 {
-                    this.world.setBlockState(pos, state.with(mchorse.bbs_mod.blocks.ModelBlock.LIGHT_LEVEL, level), Block.NOTIFY_LISTENERS);
+                    this.world.setBlockState(pos, state.with(ModelBlock.LIGHT_LEVEL, level), Block.NOTIFY_LISTENERS);
                 }
             }
             catch (Exception e) {}
@@ -238,18 +246,18 @@ public class ModelBlockEntity extends BlockEntity
 
         BlockPos pos = this.getPos();
         BlockState blockState = world.getBlockState(pos);
-
-        try
-        {
-            int level = this.properties.getLightLevel();
-
-            world.setBlockState(pos, blockState.with(mchorse.bbs_mod.blocks.ModelBlock.LIGHT_LEVEL, level), Block.NOTIFY_LISTENERS);
-        }
-        catch (Exception e)
-        {
-            world.updateListeners(pos, blockState, blockState, Block.NOTIFY_LISTENERS);
-        }
+        int level = this.properties.getLightLevel();
+        BlockState newState = blockState.with(ModelBlock.LIGHT_LEVEL, level);
 
         world.markDirty(pos);
+
+        if (blockState != newState)
+        {
+            world.setBlockState(pos, newState, Block.NOTIFY_LISTENERS);
+        }
+        else
+        {
+            world.updateListeners(pos, blockState, newState, Block.NOTIFY_LISTENERS);
+        }
     }
 }

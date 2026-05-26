@@ -1,5 +1,6 @@
 package mchorse.bbs_mod.ui.framework.elements.input.keyframes;
 
+import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.data.types.BaseType;
 import mchorse.bbs_mod.data.types.ListType;
 import mchorse.bbs_mod.data.types.MapType;
@@ -15,6 +16,7 @@ import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.IUIKeyframeG
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.KeyframeType;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.UIKeyframeDopeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.UIKeyframeGraph;
+import mchorse.bbs_mod.ui.framework.elements.utils.UIDraggable;
 import mchorse.bbs_mod.ui.utils.Area;
 import mchorse.bbs_mod.ui.utils.Scale;
 import mchorse.bbs_mod.ui.utils.ScrollDirection;
@@ -33,22 +35,18 @@ import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
 import mchorse.bbs_mod.utils.keyframes.factories.IKeyframeFactory;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
-import mchorse.bbs_mod.utils.keyframes.factories.PoseKeyframeFactory;
-import mchorse.bbs_mod.utils.keyframes.factories.TransformKeyframeFactory;
-import mchorse.bbs_mod.utils.pose.Pose;
-import mchorse.bbs_mod.utils.pose.PoseTransform;
-import mchorse.bbs_mod.utils.pose.Transform;
 import mchorse.bbs_mod.utils.presets.PresetManager;
+
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -92,6 +90,7 @@ public class UIKeyframes extends UIElement
     private SheetCache cache;
 
     private UICopyPasteController copyPasteController;
+    private UIDraggable sidebarResizer;
 
     public UIKeyframes(Consumer<Keyframe> callback)
     {
@@ -115,8 +114,14 @@ public class UIKeyframes extends UIElement
             int mouseY = context.mouseY;
             boolean hasSelected = this.currentGraph.getSelected() != null;
 
-            menu.custom(new UIPresetContextMenu(this.copyPasteController, mouseX, mouseY)
-                .labels(UIKeys.KEYFRAMES_CONTEXT_COPY, UIKeys.KEYFRAMES_CONTEXT_PASTE));
+            UIKeyframeSheet currentSheet = this.dopeSheet.getSheet(this.getContext().mouseY);
+            boolean isGroup = currentSheet != null && currentSheet.groupHeader;
+
+            if (!isGroup)
+            {
+                menu.custom(new UIPresetContextMenu(this.copyPasteController, mouseX, mouseY)
+                    .labels(UIKeys.KEYFRAMES_CONTEXT_COPY, UIKeys.KEYFRAMES_CONTEXT_PASTE));
+            }
 
             if (!this.single)
             {
@@ -128,23 +133,29 @@ public class UIKeyframes extends UIElement
                 {
                     UIKeyframeSheet sheet = this.dopeSheet.getSheet(this.getContext().mouseY);
 
-                    if (sheet != null && KeyframeFactories.isNumeric(sheet.channel.getFactory()))
+                    if (sheet != null && KeyframeFactories.isNumeric(sheet.channel.getFactory()) && !sheet.groupHeader)
                     {
                         menu.action(Icons.EDIT, UIKeys.KEYFRAMES_CONTEXT_EDIT_TRACK.format(sheet.id), () -> this.editSheet(sheet));
                     }
                 }
             }
 
-            menu.action(Icons.SEARCH, UIKeys.KEYFRAMES_CONTEXT_ADJUST_VALUES, () -> this.adjustValues());
-            menu.action(Icons.ARROW_LEFT, UIKeys.KEYFRAMES_KEYS_SELECT_LEFT, () -> this.selectAfter(mouseX, mouseY, -1));
-            menu.action(Icons.ARROW_RIGHT, UIKeys.KEYFRAMES_KEYS_SELECT_RIGHT, () -> this.selectAfter(mouseX, mouseY, 1));
+            if (!isGroup)
+            {
+                menu.action(Icons.SEARCH, UIKeys.KEYFRAMES_CONTEXT_ADJUST_VALUES, () -> this.adjustValues());
+                menu.action(Icons.ARROW_LEFT, UIKeys.KEYFRAMES_KEYS_SELECT_LEFT, () -> this.selectAfter(mouseX, mouseY, -1));
+                menu.action(Icons.ARROW_RIGHT, UIKeys.KEYFRAMES_KEYS_SELECT_RIGHT, () -> this.selectAfter(mouseX, mouseY, 1));
+            }
 
             menu.action(Icons.MAXIMIZE, UIKeys.KEYFRAMES_CONTEXT_MAXIMIZE, this::resetView);
-            menu.action(Icons.FULLSCREEN, UIKeys.KEYFRAMES_CONTEXT_SELECT_ALL, () -> this.currentGraph.selectAll());
+
+            if (!isGroup)
+            {
+                menu.action(Icons.FULLSCREEN, UIKeys.KEYFRAMES_CONTEXT_SELECT_ALL, () -> this.currentGraph.selectAll());
+            }
 
             if (hasSelected)
             {
-                menu.action(Icons.EXCHANGE, UIKeys.KEYFRAMES_CONTEXT_INVERT, this::invertKeyframesMenu);
                 menu.action(Icons.CURVES, UIKeys.KEYFRAMES_CONTEXT_INTERPOLATION, this::interpolationMenu);
                 menu.action(Icons.CONVERT, UIKeys.KEYFRAMES_CONTEXT_SPREAD, this::spreadKeyframes);
                 menu.action(Icons.OUTLINE_SPHERE, UIKeys.KEYFRAMES_CONTEXT_ROUND, () ->
@@ -182,6 +193,21 @@ public class UIKeyframes extends UIElement
         {
             if (this.copyPasteController.copy()) UIUtils.playClick();
         }).inside().category(category);
+        this.keys().register(Keys.CUT, () ->
+        {
+            if (this.currentGraph.getSelected() == null)
+            {
+                this.getContext().notifyError(UIKeys.GENERAL_CUT_EMPTY);
+                return;
+            }
+
+            if (this.copyPasteController.copy())
+            {
+                this.currentGraph.removeSelected();
+                UIUtils.playClick();
+                this.getContext().notifyInfo(UIKeys.GENERAL_CUT);
+            }
+        }).inside().category(category).active(canModify);
         this.keys().register(Keys.PASTE, () ->
         {
             UIContext context = this.getContext();
@@ -218,6 +244,39 @@ public class UIKeyframes extends UIElement
         this.keys().register(Keys.KEYFRAMES_SELECT_NEXT, () -> this.selectNextKeyframe(1)).category(category);
         this.keys().register(Keys.KEYFRAMES_SPREAD, this::spreadKeyframes).category(category);
         this.keys().register(Keys.KEYFRAMES_ADJUST_VALUES, this::adjustValues).category(category);
+
+        this.sidebarResizer = new UIDraggable((context) ->
+        {
+            int width = context.mouseX - this.area.x;
+
+            this.dopeSheet.setSidebarWidth(width);
+            this.updateSidebarResizerState();
+            this.resize();
+        })
+        {
+            @Override
+            protected boolean subMouseClicked(UIContext context)
+            {
+                if (this.area.isInside(context) && context.mouseButton == 0 && Window.isCtrlPressed())
+                {
+                    UIKeyframes.this.dopeSheet.setSidebarWidth(IUIKeyframeGraph.SIDEBAR_WIDTH);
+                    UIKeyframes.this.updateSidebarResizerState();
+                    UIKeyframes.this.resize();
+
+                    return true;
+                }
+
+                return super.subMouseClicked(context);
+            }
+        }.rendering((context) ->
+        {
+            float alpha = (this.sidebarResizer.isDragging() || this.sidebarResizer.area.isInside(context)) ? 0.75F : 0.5F;
+            int color = Colors.setA(BBSSettings.primaryColor.get(), alpha);
+
+            context.batcher.box(this.sidebarResizer.area.x, this.sidebarResizer.area.y, this.sidebarResizer.area.ex(), this.sidebarResizer.area.ey(), color);
+        });
+        this.add(this.sidebarResizer);
+        this.updateSidebarResizerState();
     }
 
     public UIKeyframes single()
@@ -271,18 +330,6 @@ public class UIKeyframes extends UIElement
         }
     }
 
-    private void invertKeyframesMenu()
-    {
-        this.getContext().replaceContextMenu((menu2) ->
-        {
-            menu2.autoKeys();
-            menu2.action(Icons.ALL_DIRECTIONS, UIKeys.KEYFRAMES_CONTEXT_INVERT_TRANSLATION, () -> this.invertKeyframes(InvertMode.TRANSLATION));
-            menu2.action(Icons.MAXIMIZE, UIKeys.KEYFRAMES_CONTEXT_INVERT_SCALE, () -> this.invertKeyframes(InvertMode.SCALE));
-            menu2.action(Icons.REFRESH, UIKeys.KEYFRAMES_CONTEXT_INVERT_ROTATION, () -> this.invertKeyframes(InvertMode.ROTATION));
-            menu2.action(Icons.REFRESH, UIKeys.KEYFRAMES_CONTEXT_INVERT_ROTATION2, () -> this.invertKeyframes(InvertMode.ROTATION2));
-        });
-    }
-
     private void adjustValues(boolean last)
     {
         for (UIKeyframeSheet sheet : this.getGraph().getSheets())
@@ -314,87 +361,6 @@ public class UIKeyframes extends UIElement
 
             sheet.channel.postNotify();
         }
-    }
-
-    private void invertKeyframes(InvertMode mode)
-    {
-        for (UIKeyframeSheet sheet : this.getGraph().getSheets())
-        {
-            List<Keyframe> selected = sheet.selection.getSelected();
-            IKeyframeFactory factory = sheet.channel.getFactory();
-
-            if (selected.isEmpty())
-            {
-                continue;
-            }
-
-            if (factory instanceof TransformKeyframeFactory)
-            {
-                sheet.channel.preNotify();
-
-                for (Keyframe keyframe : selected)
-                {
-                    Transform transform = (Transform) keyframe.getValue();
-                    Transform copy = transform == null ? new Transform() : transform.copy();
-
-                    this.invertTransform(copy, mode);
-
-                    keyframe.setValue(copy);
-                }
-
-                sheet.channel.postNotify();
-            }
-            else if (factory instanceof PoseKeyframeFactory)
-            {
-                sheet.channel.preNotify();
-
-                for (Keyframe keyframe : selected)
-                {
-                    Pose pose = (Pose) keyframe.getValue();
-                    Pose copy = pose == null ? new Pose() : pose.copy();
-
-                    for (PoseTransform transform : copy.transforms.values())
-                    {
-                        this.invertTransform(transform, mode);
-                    }
-
-                    keyframe.setValue(copy);
-                }
-
-                sheet.channel.postNotify();
-            }
-        }
-    }
-
-    private void invertTransform(Transform transform, InvertMode mode)
-    {
-        if (mode == InvertMode.TRANSLATION)
-        {
-            transform.translate.mul(-1F);
-        }
-
-        if (mode == InvertMode.SCALE)
-        {
-            transform.scale.mul(-1F);
-        }
-
-        if (mode == InvertMode.ROTATION)
-        {
-            transform.rotate.mul(-1F);
-        }
-
-        if (mode == InvertMode.ROTATION2)
-        {
-            transform.rotate2.mul(-1F);
-        }
-    }
-
-    private enum InvertMode
-    {
-        TRANSLATION,
-        SCALE,
-        ROTATION,
-        ROTATION2
     }
 
     public UIKeyframes changed(Runnable runnable)
@@ -975,6 +941,13 @@ public class UIKeyframes extends UIElement
         return this.currentGraph;
     }
 
+    public UIKeyframes setPresetsPreview(UICopyPasteController.IPresetPreview preview)
+    {
+        this.copyPasteController.preview(preview);
+
+        return this;
+    }
+
     public Scale getXAxis()
     {
         return this.xAxis;
@@ -1062,7 +1035,7 @@ public class UIKeyframes extends UIElement
             max = this.getDuration();
         }
 
-        int sidebar = this.currentGraph instanceof UIKeyframeDopeSheet ? IUIKeyframeGraph.SIDEBAR_WIDTH : 0;
+        int sidebar = this.currentGraph instanceof UIKeyframeDopeSheet ? this.currentGraph.getSidebarWidth() : 0;
 
         if (Math.abs(max - min) > 0.01F)
         {
@@ -1097,6 +1070,7 @@ public class UIKeyframes extends UIElement
         super.resize();
 
         this.currentGraph.resize();
+        this.updateSidebarResizerState();
 
         if (!Operation.equals(minValue, maxValue))
         {
@@ -1316,6 +1290,7 @@ public class UIKeyframes extends UIElement
     @Override
     public void render(UIContext context)
     {
+        this.updateSidebarResizerState();
         super.render(context);
 
         this.handleMouse(context);
@@ -1402,7 +1377,7 @@ public class UIKeyframes extends UIElement
         {
             int leftBorder = this.toGraphX(0);
             int rightBorder = this.toGraphX(duration);
-            int sidebarX = this.area.x + IUIKeyframeGraph.SIDEBAR_WIDTH;
+            int sidebarX = this.area.x + (this.currentGraph instanceof UIKeyframeDopeSheet ? this.currentGraph.getSidebarWidth() : 0);
 
             if (leftBorder > sidebarX) context.batcher.box(sidebarX, this.area.y, Math.min(this.area.ex(), leftBorder), this.area.y + this.area.h, Colors.A50);
             if (rightBorder < this.area.ex()) context.batcher.box(Math.max(sidebarX, rightBorder), this.area.y, this.area.ex() , this.area.y + this.area.h, Colors.A50);
@@ -1412,6 +1387,34 @@ public class UIKeyframes extends UIElement
         {
             this.backgroundRender.accept(context);
         }
+    }
+
+    private void updateSidebarResizerState()
+    {
+        if (this.sidebarResizer == null)
+        {
+            return;
+        }
+
+        boolean dopeSheet = this.currentGraph == this.dopeSheet;
+        boolean locked = BBSSettings.editorLayoutSettings != null && BBSSettings.editorLayoutSettings.isLayoutLocked();
+        boolean visible = dopeSheet && !locked;
+
+        this.sidebarResizer.setVisible(visible);
+        this.sidebarResizer.setEnabled(visible);
+
+        if (!visible)
+        {
+            return;
+        }
+
+        this.dopeSheet.setSidebarWidth(this.dopeSheet.getSidebarWidth());
+
+        int x = this.area.x + this.dopeSheet.getSidebarWidth() - 3;
+        int y = this.area.my() - 20;
+
+        this.sidebarResizer.relative(this).x(x - this.area.x).y(y - this.area.y).w(6).h(40);
+        this.sidebarResizer.resize();
     }
 
     /* Caching state */
@@ -1453,6 +1456,7 @@ public class UIKeyframes extends UIElement
 
     public void copyViewport(UIKeyframes lastEditor)
     {
+        this.getDopeSheet().setSidebarWidth(lastEditor.getDopeSheet().getSidebarWidth());
         this.getDopeSheet().setTrackHeight(lastEditor.getDopeSheet().getTrackHeight());
         this.getXAxis().copy(lastEditor.getXAxis());
         this.getDopeSheet().getYAxis().copy(lastEditor.getDopeSheet().getYAxis());

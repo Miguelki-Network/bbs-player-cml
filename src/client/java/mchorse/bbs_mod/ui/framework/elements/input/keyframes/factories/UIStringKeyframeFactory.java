@@ -7,10 +7,11 @@ import mchorse.bbs_mod.ui.forms.editors.utils.UIStructureOverlayPanel;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframes;
-import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlay;
-import mchorse.bbs_mod.ui.framework.elements.overlay.UIListOverlayPanel;
 import mchorse.bbs_mod.ui.framework.elements.input.text.UITextbox;
+import mchorse.bbs_mod.ui.framework.elements.overlay.UIListOverlayPanel;
+import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlay;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
+
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -45,14 +46,21 @@ public class UIStringKeyframeFactory extends UIKeyframeFactory<String>
             {
                 UIStructureOverlayPanel panel = new UIStructureOverlayPanel(UIKeys.FORMS_EDITORS_STRUCTURE_PICK_STRUCTURE, (link) ->
                 {
-                    String value = link == null ? "" : link.path;
+                    String value = link == null ? "" : link.toString();
                     this.editor.getGraph().setValue(value, true);
                 });
 
                 String current = this.keyframe.getValue();
                 if (current != null && !current.isEmpty())
                 {
-                    panel.set(Link.assets(current));
+                    try
+                    {
+                        panel.set(Link.create(current));
+                    }
+                    catch (Exception e)
+                    {
+                        panel.set(Link.assets(current));
+                    }
                 }
 
                 UIOverlay.addOverlay(this.getContext(), panel, 280, 0.5F);

@@ -2,8 +2,8 @@ package mchorse.bbs_mod.camera.clips.misc;
 
 import mchorse.bbs_mod.camera.clips.CameraClip;
 import mchorse.bbs_mod.camera.data.Position;
-import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.settings.values.core.ValueLink;
+import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.clips.ClipContext;
 
@@ -32,6 +32,12 @@ public class AudioClip extends CameraClip
         super.shiftLeft(tick);
 
         this.offset.set(this.offset.get() - (this.tick.get() - tick));
+    }
+
+    @Override
+    public boolean isPositionClip()
+    {
+        return false;
     }
 
     @Override

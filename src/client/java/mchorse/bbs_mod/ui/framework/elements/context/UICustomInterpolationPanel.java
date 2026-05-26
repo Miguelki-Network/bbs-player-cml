@@ -2,6 +2,7 @@ package mchorse.bbs_mod.ui.framework.elements.context;
 
 import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.graphics.window.Window;
+import mchorse.bbs_mod.l10n.L10n;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.framework.UIContext;
@@ -33,10 +34,12 @@ import mchorse.bbs_mod.utils.interps.InterpContext;
 import mchorse.bbs_mod.utils.interps.Interpolation;
 import mchorse.bbs_mod.utils.interps.Interpolations;
 import mchorse.bbs_mod.utils.interps.easings.EasingArgs;
+import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import mchorse.bbs_mod.utils.undo.IUndo;
 import mchorse.bbs_mod.utils.undo.UndoManager;
+
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Map;
@@ -89,14 +92,14 @@ public class UICustomInterpolationPanel extends UIOverlayPanel
         channel.insert(0, 0D);
         channel.insert(1, 1D);
 
-        for (mchorse.bbs_mod.utils.keyframes.Keyframe keyframe : channel.getKeyframes())
+        for (Keyframe keyframe : channel.getKeyframes())
         {
             keyframe.getInterpolation().setInterp(Interpolations.BEZIER);
             keyframe.lx = 0.15f;
             keyframe.rx = 0.15f;
         }
 
-        UIKeyframeSheet sheet = new UIKeyframeSheet("interp", IKey.raw("interp"), Colors.ACTIVE, false, channel, null);
+        UIKeyframeSheet sheet = new UIKeyframeSheet("interp", L10n.lang("bbs.ui.raw.interp"), Colors.ACTIVE, false, channel, null);
 
         this.keyframes.addSheet(sheet);
         this.keyframes.editSheet(sheet);
@@ -215,7 +218,7 @@ public class UICustomInterpolationPanel extends UIOverlayPanel
 
         for (int i = 0; i <= samples; i++)
         {
-            mchorse.bbs_mod.utils.keyframes.Keyframe<Double> k = channel.get(i);
+            Keyframe<Double> k = channel.get(i);
             double x = k.getTick();
             double y = k.getValue();
 

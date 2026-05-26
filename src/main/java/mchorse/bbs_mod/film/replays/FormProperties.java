@@ -5,6 +5,7 @@ import mchorse.bbs_mod.data.types.MapType;
 import mchorse.bbs_mod.forms.FormUtils;
 import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.forms.forms.ModelForm;
+import mchorse.bbs_mod.forms.forms.utils.StructureLightSettings;
 import mchorse.bbs_mod.settings.values.base.BaseKeyframeFactoryValue;
 import mchorse.bbs_mod.settings.values.base.BaseValue;
 import mchorse.bbs_mod.settings.values.base.BaseValueBasic;
@@ -12,6 +13,7 @@ import mchorse.bbs_mod.settings.values.core.ValueGroup;
 import mchorse.bbs_mod.settings.values.core.ValuePose;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.interps.Interpolations;
+import mchorse.bbs_mod.utils.interps.Lerps;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
@@ -20,10 +22,12 @@ import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import mchorse.bbs_mod.utils.pose.Pose;
 import mchorse.bbs_mod.utils.pose.PoseTransform;
 import mchorse.bbs_mod.utils.pose.Transform;
+import mchorse.bbs_mod.utils.resources.LinkUtils;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.TreeSet;
 
 public class FormProperties extends ValueGroup
 {
@@ -166,6 +170,47 @@ public class FormProperties extends ValueGroup
                         poseTransform.rotate.add(transform.rotate);
                         poseTransform.rotate2.add(transform.rotate2);
                     }
+
+                    PoseTransform sourcePose = null;
+
+                    if (transform instanceof PoseTransform transformPose)
+                    {
+                        sourcePose = transformPose;
+                    }
+                    else
+                    {
+                        Object closestValue = segment.getClosest().getValue();
+
+                        if (closestValue instanceof PoseTransform closestPose)
+                        {
+                            sourcePose = closestPose;
+                        }
+                    }
+
+                    if (sourcePose != null)
+                    {
+                        if (blend < 1F)
+                        {
+                            poseTransform.fix = Lerps.lerp(poseTransform.fix, sourcePose.fix, blend);
+                            poseTransform.color.r = Lerps.lerp(poseTransform.color.r, sourcePose.color.r, blend);
+                            poseTransform.color.g = Lerps.lerp(poseTransform.color.g, sourcePose.color.g, blend);
+                            poseTransform.color.b = Lerps.lerp(poseTransform.color.b, sourcePose.color.b, blend);
+                            poseTransform.color.a = Lerps.lerp(poseTransform.color.a, sourcePose.color.a, blend);
+                            poseTransform.lighting = Lerps.lerp(poseTransform.lighting, sourcePose.lighting, blend);
+
+                            if (sourcePose.texture != null && blend >= 0.5F)
+                            {
+                                poseTransform.texture = LinkUtils.copy(sourcePose.texture);
+                            }
+                        }
+                        else
+                        {
+                            poseTransform.fix = sourcePose.fix;
+                            poseTransform.color.copy(sourcePose.color);
+                            poseTransform.lighting = sourcePose.lighting;
+                            poseTransform.texture = LinkUtils.copy(sourcePose.texture);
+                        }
+                    }
                 }
 
                 return;
@@ -256,9 +301,9 @@ public class FormProperties extends ValueGroup
     @Override
     public void fromData(BaseType data)
     {
-        super.fromData(data);
-
+        /* FormProperties stores dynamic channels; rebuild from serialized data to avoid stale channels. */
         this.properties.clear();
+        this.removeAll();
 
         if (!data.isMap())
         {
@@ -313,8 +358,8 @@ public class FormProperties extends ValueGroup
             {
                 KeyframeChannel<?> mergedAny = this.properties.get("structure_light");
                 @SuppressWarnings("unchecked")
-                KeyframeChannel<mchorse.bbs_mod.forms.forms.utils.StructureLightSettings> merged = mergedAny != null
-                    ? (KeyframeChannel<mchorse.bbs_mod.forms.forms.utils.StructureLightSettings>) mergedAny
+                KeyframeChannel<StructureLightSettings> merged = mergedAny != null
+                    ? (KeyframeChannel<StructureLightSettings>) mergedAny
                     : new KeyframeChannel<>("structure_light", KeyframeFactories.STRUCTURE_LIGHT_SETTINGS);
 
                 if (mergedAny == null)
@@ -323,7 +368,7 @@ public class FormProperties extends ValueGroup
                     this.add(merged);
                 }
 
-                java.util.TreeSet<Float> ticks = new java.util.TreeSet<>();
+                TreeSet<Float> ticks = new TreeSet<>();
                 if (emit != null) for (Object kfObj : emit.getKeyframes()) { ticks.add(((Keyframe<?>) kfObj).getTick()); }
                 if (intensity != null) for (Object kfObj : intensity.getKeyframes()) { ticks.add(((Keyframe<?>) kfObj).getTick()); }
 
@@ -353,7 +398,7 @@ public class FormProperties extends ValueGroup
                         }
                     }
 
-                    mchorse.bbs_mod.forms.forms.utils.StructureLightSettings payload = new mchorse.bbs_mod.forms.forms.utils.StructureLightSettings(
+                    StructureLightSettings payload = new StructureLightSettings(
                         enabled,
                         Math.max(0, Math.min(15, value))
                     );

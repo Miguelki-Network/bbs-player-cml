@@ -1,4 +1,4 @@
- package mchorse.bbs_mod.camera.clips.misc;
+package mchorse.bbs_mod.camera.clips.misc;
 
 import mchorse.bbs_mod.camera.clips.CameraClip;
 import mchorse.bbs_mod.camera.data.Position;
@@ -60,6 +60,12 @@ public class VideoClip extends CameraClip
         super.shiftLeft(tick);
 
         this.offset.set(this.offset.get() - (this.tick.get() - tick));
+    }
+
+    @Override
+    public boolean isPositionClip()
+    {
+        return false;
     }
 
     @Override
