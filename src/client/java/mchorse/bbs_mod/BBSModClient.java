@@ -279,10 +279,10 @@ public class BBSModClient implements ClientModInitializer
     // }
     // ================================================================
 
-    public static KeyBinding getKeyOpenQuickReplays()
-    {
-        return keyOpenQuickReplays;
-    }
+    // public static KeyBinding getKeyOpenQuickReplays()
+    // {
+    //     return keyOpenQuickReplays;
+    // }
 
     public static UIDashboard getDashboard()
     {
